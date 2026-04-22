@@ -13,11 +13,58 @@
   
 </head>
 <body>
-<!-- SIDEBAR (identico) -->
-<aside class="sidebar">...</aside>
+
+<!-- SIDEBAR (completo) -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-s">S</div>
+    <span>SkillBridge</span>
+  </div>
+  <div class="sidebar-sec">
+    <div class="sec-lbl">Menu Principale</div>
+    <a href="/dashboard" class="nav-item">
+      <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor"/><rect x="14" y="3" width="7" height="7" rx="1.5" stroke="currentColor"/><rect x="3" y="14" width="7" height="7" rx="1.5" stroke="currentColor"/><rect x="14" y="14" width="7" height="7" rx="1.5" stroke="currentColor"/></svg>
+      Dashboard
+    </a>
+    <a href="/cerca" class="nav-item">
+      <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><circle cx="11" cy="11" r="8" stroke="currentColor"/><path stroke-linecap="round" d="m21 21-4.35-4.35" stroke="currentColor"/></svg>
+      Cerca
+    </a>
+    <a href="/mie-lezioni" class="nav-item">
+      <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" stroke="currentColor"/></svg>
+      Le Mie Lezioni
+    </a>
+    <a href="/messaggi" class="nav-item active">
+      <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.76c0 1.6 1.123 2.994 2.707 3.227 1.068.157 2.148.279 3.238.364.466.037.893.281 1.153.671L12 21l2.652-3.978c.26-.39.687-.634 1.153-.67 1.09-.086 2.17-.208 3.238-.365 1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" stroke="currentColor"/></svg>
+      Messaggi
+    </a>
+  </div>
+  <div class="sidebar-sec">
+    <div class="sec-lbl">Account</div>
+    <a href="/profilo" class="nav-item">
+      <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" stroke="currentColor"/></svg>
+      Profilo
+    </a>
+  </div>
+  <div class="sb-space"></div>
+  <div class="sb-out">
+    <a href="/api/logout">
+      <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 9V5.25A2.25 2.25 0 0 1 10.5 3h6a2.25 2.25 0 0 1 2.25 2.25v13.5A2.25 2.25 0 0 1 16.5 21h-6a2.25 2.25 0 0 1-2.25-2.25V15m-3 0-3-3m0 0 3-3m-3 3H15" stroke="currentColor"/></svg>
+      Esci
+    </a>
+  </div>
+</aside>
 
 <div class="main-content">
-  <div class="conv-panel">...</div>
+  <div class="conv-panel">
+    <div class="conv-search-wrap">
+      <div class="conv-search">
+        <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><circle cx="11" cy="11" r="8" stroke="currentColor"/><path stroke-linecap="round" d="m21 21-4.35-4.35" stroke="currentColor"/></svg>
+        <input type="text" id="conv-search-input" placeholder="Cerca conversazione..." oninput="filterConvs(this.value)"/>
+      </div>
+    </div>
+    <div class="conv-list" id="conv-list"></div>
+  </div>
   <div class="chat-area" id="chat-area"></div>
 </div>
 
