@@ -4,6 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>SkillBridge – Messaggi</title>
+  <link rel="manifest" href="/static/manifest.json">
+  <meta name="theme-color" content="#2584ff">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="apple-touch-icon" href="/static/icons/icon-152x152.png">
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -195,11 +199,15 @@
 </div><!-- /main-content -->
 
 <script>
-  // Carica conversazioni dal backend
+  // Variabili globali per socket_chat.js
+  window.activeChatId = null;
+  window.activeSenderName = '';
+
+  // Carica conversazioni all'avvio
   window.addEventListener('load', () => {
     loadConversations();
   });
-  
+
   function loadConversations() {
     fetch('/api/messaggi/conversazioni')
       .then(r => r.json())
@@ -207,49 +215,62 @@
         if (data.ok) {
           renderConvList(data.conversazioni);
           if (data.conversazioni.length > 0) {
-            openConv(data.conversazioni[0].id_utente);
+            openConv(data.conversazioni[0].id_utente, data.conversazioni[0].nome);
           }
         }
       })
       .catch(err => console.error('Errore:', err));
   }
-  
-  let activeId = null;
+
   let myUserId = null;
-  
+
   function renderConvList(conversations, filter = '') {
-    const el = document.getElementById('conv-list');
-    const vis = conversations.filter(c => 
-      c.nome.toLowerCase().includes(filter.toLowerCase())
-    );
-    
-    el.innerHTML = vis.map(c => {
-      const last = c.ultimo_messaggio || {};
-      const prev = last.contenuto ? (last.mittente_id === myUserId ? 'Tu: ' : '') + last.contenuto : '';
-      
-      return `<div class="conv-item${c.id_utente === activeId ? ' active' : ''}" onclick="openConv('${c.id_utente}')">
-        <div class="av-wrap">
-          <div class="conv-av">
-            <svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="22" cy="22" r="22" fill="#0f2a3f"/>
-              <text x="22" y="28" text-anchor="middle" font-size="18" font-weight="bold" fill="#fff">
-                ${c.nome.charAt(0).toUpperCase()}
-              </text>
-            </svg>
-          </div>
-          ${c.online ? '<div class="dot-online"></div>' : ''}
-        </div>
-        <div class="conv-info">
-          <div class="conv-top">
-            <span class="conv-name">${c.nome}</span>
-            <span class="conv-time">${last.data_invio ? last.data_invio.substring(0, 5) : ''}</span>
-          </div>
-          <div class="conv-prev">${prev.substring(0, 40)}${prev.length > 40 ? '...' : ''}</div>
-        </div>
-      </div>`;
-    }).join('');
-  }
+  const el = document.getElementById('conv-list');
+  const vis = conversations.filter(c => 
+    c.nome.toLowerCase().includes(filter.toLowerCase())
+  );
   
+  el.innerHTML = vis.map(c => {
+    const prev = c.ultimo_msg ? (c.mittente_id === myUserId ? 'Tu: ' : '') + c.ultimo_msg : '';
+    return `<div class="conv-item${c.id_utente === window.activeChatId ? ' active' : ''}" 
+                  data-user-id="${c.id_utente}" 
+                  onclick="openConv(${c.id_utente}, '${c.nome.replace(/'/g, "\\'")}')">
+      <div class="av-wrap">
+        <div class="conv-av">
+          <svg viewBox="0 0 44 44">
+            <circle cx="22" cy="22" r="22" fill="#0f2a3f"/>
+            <text x="22" y="28" text-anchor="middle" font-size="18" font-weight="bold" fill="#fff">
+              ${c.nome.charAt(0).toUpperCase()}
+            </text>
+          </svg>
+        </div>
+        ${c.online ? '<div class="dot-online"></div>' : ''}
+      </div>
+      <div class="conv-info">
+        <div class="conv-top">
+          <span class="conv-name">${c.nome}</span>
+          <span class="conv-time">${c.ora || ''}</span>
+        </div>
+        <div class="conv-prev">${prev.substring(0, 40)}${prev.length > 40 ? '...' : ''}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+  // Funzione per aggiornare l'anteprima di una conversazione (chiamata da socket_chat.js)
+  window.updateConvPreview = function(userId, testo, ora) {
+    const items = document.querySelectorAll(`.conv-item[data-user-id="${userId}"]`);
+    items.forEach(item => {
+      const prevEl = item.querySelector('.conv-prev');
+      const timeEl = item.querySelector('.conv-time');
+      if (prevEl) prevEl.textContent = testo;
+      if (timeEl) timeEl.textContent = ora;
+      // Sposta in cima alla lista
+      const list = item.parentElement;
+      if (list) list.prepend(item);
+    });
+  };
+
   function filterConvs(v) {
     fetch('/api/messaggi/conversazioni')
       .then(r => r.json())
@@ -257,31 +278,28 @@
         if (data.ok) renderConvList(data.conversazioni, v);
       });
   }
-  
-  function renderChat(userId) {
+
+  function renderChat(userId, userName) {
     fetch(`/api/messaggi/chat/${userId}`)
       .then(r => r.json())
       .then(data => {
         if (data.ok) {
           myUserId = data.my_user_id;
-          const conv = data.conversazione;
           
           document.getElementById('chat-area').innerHTML = `
             <div class="chat-hdr">
               <div class="chat-hdr-l">
                 <div class="hdr-av">
-                  <svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+                  <svg viewBox="0 0 44 44">
                     <circle cx="22" cy="22" r="22" fill="#0f2a3f"/>
                     <text x="22" y="28" text-anchor="middle" font-size="18" font-weight="bold" fill="#fff">
-                      ${conv.nome.charAt(0).toUpperCase()}
+                      ${userName.charAt(0).toUpperCase()}
                     </text>
                   </svg>
                 </div>
                 <div>
-                  <div class="hdr-name">${conv.nome}</div>
-                  <div class="${conv.online ? 'hdr-online' : 'hdr-offline'}">
-                    ${conv.online ? 'Online' : 'Offline'}
-                  </div>
+                  <div class="hdr-name">${userName}</div>
+                  <div class="hdr-offline">Online</div>
                 </div>
               </div>
               <button class="menu-btn">
@@ -292,18 +310,18 @@
             </div>
             <div class="msgs" id="chat-msgs">
               ${data.messaggi.map(m => `
-                <div class="${m.mittente_id === data.my_user_id ? 'msg-out' : 'msg-in'}">
-                  <div class="bbl">${m.contenuto}</div>
-                  <div class="ts">${m.data_invio.substring(11, 16)}</div>
+                <div class="${m.id_mittente === data.my_user_id ? 'msg-out' : 'msg-in'}">
+                  <div class="bbl">${escapeHtml(m.contenuto)}</div>
+                  <div class="ts">${m.ora || m.data_invio?.substring(11, 16) || ''}</div>
                 </div>
               `).join('')}
             </div>
             <div class="chat-bar">
               <div class="inp-wrap">
                 <input type="text" id="chat-input" placeholder="Scrivi un messaggio..."
-                  onkeydown="if(event.key==='Enter')sendMsg('${userId}')"/>
+                  onkeydown="if(event.key==='Enter') window.sendMessage && window.sendMessage()"/>
               </div>
-              <button class="send-btn" onclick="sendMsg('${userId}')">
+              <button class="send-btn" onclick="window.sendMessage && window.sendMessage()">
                 <svg viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5"/>
                 </svg>
@@ -311,40 +329,43 @@
             </div>
           `;
           
-          const m = document.getElementById('chat-msgs');
-          if (m) m.scrollTop = m.scrollHeight;
+          const msgsDiv = document.getElementById('chat-msgs');
+          if (msgsDiv) msgsDiv.scrollTop = msgsDiv.scrollHeight;
+        } else {
+          console.error('Errore chat:', data.error);
         }
-      });
+      })
+      .catch(err => console.error('Errore fetch chat:', err));
   }
-  
-  function sendMsg(userId) {
-    const inp = document.getElementById('chat-input');
-    const txt = inp.value.trim();
-    if (!txt) return;
-    
-    fetch(`/api/messaggi/invia`, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({id_destinatario: userId, contenuto: txt})
-    })
-    .then(r => r.json())
-    .then(data => {
-      if (data.ok) {
-        inp.value = '';
-        renderChat(userId);
-        loadConversations();
-      }
+
+  function openConv(userId, userName) {
+    window.activeChatId = userId;
+    window.activeSenderName = userName;
+    renderChat(userId, userName);
+    // Aggiorna la classe "active" nella lista
+    document.querySelectorAll('.conv-item').forEach(el => {
+      if (el.dataset.userId == userId) el.classList.add('active');
+      else el.classList.remove('active');
     });
   }
-  
-  function openConv(id) {
-    activeId = id;
-    renderChat(id);
+
+  // Helper per evitare XSS
+  function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/[&<>]/g, function(m) {
+      if (m === '&') return '&amp;';
+      if (m === '<') return '&lt;';
+      if (m === '>') return '&gt;';
+      return m;
+    });
   }
-  
+
   document.addEventListener('DOMContentLoaded', () => {
     loadConversations();
   });
-  </script>
+</script>
+  <script src="/static/js/pwa_init.js"></script>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script src="/static/js/socket_chat.js"></script>
 </body>
 </html>
