@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SkillBridge – Profilo</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --sidebar-w:  240px;
+      --bg:         #060f1a;
+      --sidebar-bg: #080f18;
+      --card-bg:    #0d1f2f;
+      --card-border:rgba(255,255,255,0.07);
+      --input-bg:   #0a1929;
+      --blue:       #2584ff;
+      --blue-dim:   rgba(37,132,255,0.15);
+      --green:      #1db97b;
+      --green-dim:  rgba(29,185,123,0.18);
+      --text-main:  #ffffff;
+      --text-sub:   rgba(255,255,255,0.50);
+      --text-muted: rgba(255,255,255,0.28);
+    }
+
+    html, body { height: 100%; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: radial-gradient(ellipse 80% 60% at 70% 50%, #0a2a4a 0%, var(--bg) 60%);
+      color: var(--text-main);
+      display: flex; min-height: 100vh;
+    }
+
+    /* ── SIDEBAR ── */
+    .sidebar {
+      width: var(--sidebar-w); min-height: 100vh;
+      background: var(--sidebar-bg);
+      border-right: 1px solid var(--card-border);
+      display: flex; flex-direction: column;
+      padding: 0 0 24px;
+      position: fixed; top: 0; left: 0; bottom: 0; z-index: 100;
+    }
+    .sidebar-logo { display: flex; align-items: center; gap: 10px; padding: 20px 20px 28px; }
+    .sidebar-logo .avatar {
+      width: 36px; height: 36px; background: var(--blue); border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1rem; font-weight: 700; color: #fff; flex-shrink: 0;
+      box-shadow: 0 0 0 2px rgba(37,132,255,0.35), 0 2px 8px rgba(37,132,255,0.4);
+    }
+    .sidebar-logo span { font-size: 1.1rem; font-weight: 700; }
+    .sidebar-section { padding: 0 12px; margin-bottom: 24px; }
+    .sidebar-section-label {
+      font-size: 0.7rem; font-weight: 600; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.08em; padding: 0 8px; margin-bottom: 6px;
+    }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 9px;
+      color: var(--text-sub); font-size: 0.9rem; font-weight: 500;
+      text-decoration: none; transition: background 0.15s, color 0.15s;
+    }
+    .nav-item:hover { background: rgba(255,255,255,0.05); color: var(--text-main); }
+    .nav-item.active { background: var(--blue-dim); color: var(--blue); }
+    .nav-item svg { width: 18px; height: 18px; stroke: currentColor; flex-shrink: 0; }
+    .sidebar-spacer { flex: 1; }
+    .sidebar-logout { margin: 0 12px; }
+    .sidebar-logout a {
+      display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 9px;
+      color: rgba(255,80,80,0.7); font-size: 0.9rem; font-weight: 500;
+      text-decoration: none; transition: background 0.15s, color 0.15s;
+    }
+    .sidebar-logout a:hover { background: rgba(255,80,80,0.08); color: #ff6060; }
+    .sidebar-logout svg { width: 18px; height: 18px; stroke: currentColor; }
+
+    /* ── MAIN ── */
+    .main { margin-left: var(--sidebar-w); flex: 1; padding: 48px 60px 60px; max-width: 1100px; }
+
+    /* ── PROFILE HEADER ── */
+    .profile-header {
+      display: flex; align-items: flex-start; gap: 36px; margin-bottom: 40px;
+    }
+    .avatar-wrap { position: relative; flex-shrink: 0; }
+    .avatar-wrap img, .avatar-placeholder {
+      width: 120px; height: 120px; border-radius: 50%;
+      border: 3px solid var(--blue);
+      object-fit: cover; display: block;
+    }
+    .avatar-placeholder {
+      background: #1a3d5c;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2.8rem; font-weight: 700; color: rgba(255,255,255,0.4);
+    }
+    .avatar-edit {
+      position: absolute; bottom: 4px; right: 4px;
+      width: 32px; height: 32px; border-radius: 50%;
+      background: var(--blue); border: 2px solid var(--bg);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+    }
+    .avatar-edit svg { width: 14px; height: 14px; stroke: #fff; }
+
+    .profile-info { flex: 1; }
+    .profile-top { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
+    .profile-name { font-size: 2rem; font-weight: 800; letter-spacing: -0.03em; }
+    .btn-edit {
+      background: var(--card-bg); border: 1px solid var(--card-border);
+      color: var(--text-main); font-family: inherit; font-size: 0.875rem; font-weight: 600;
+      padding: 9px 18px; border-radius: 10px; cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn-edit:hover { background: rgba(255,255,255,0.08); }
+    .btn-settings {
+      background: var(--card-bg); border: 1px solid var(--card-border);
+      color: var(--text-sub); padding: 9px 11px; border-radius: 10px;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s, color 0.15s;
+    }
+    .btn-settings:hover { background: rgba(255,255,255,0.08); color: var(--text-main); }
+    .btn-settings svg { width: 18px; height: 18px; stroke: currentColor; }
+
+    .stats-row { display: flex; gap: 40px; margin-bottom: 18px; }
+    .stat-item { text-align: center; }
+    .stat-item strong { display: block; font-size: 1.4rem; font-weight: 800; line-height: 1; }
+    .stat-item span   { font-size: 0.72rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+
+    .profile-tagline { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .profile-tagline strong { font-size: 0.95rem; font-weight: 700; }
+    .top-mentor-badge {
+      font-size: 0.72rem; font-weight: 700;
+      padding: 4px 12px; border-radius: 20px;
+      border: 1px solid rgba(255,255,255,0.22); color: var(--text-sub);
+      letter-spacing: 0.04em;
+    }
+    .profile-bio { font-size: 0.9rem; color: var(--text-sub); font-style: italic; }
+
+    /* ── TABS ── */
+    .tabs-bar {
+      display: flex; gap: 0;
+      border-bottom: 1px solid var(--card-border);
+      margin-bottom: 36px;
+    }
+    .ptab {
+      display: flex; align-items: center; gap: 7px;
+      padding: 14px 28px;
+      font-family: inherit; font-size: 0.85rem; font-weight: 600;
+      color: var(--text-muted); background: none; border: none;
+      border-bottom: 2px solid transparent;
+      cursor: pointer; transition: color 0.15s, border-color 0.15s;
+      text-transform: uppercase; letter-spacing: 0.07em;
+      margin-bottom: -1px;
+    }
+    .ptab svg { width: 15px; height: 15px; stroke: currentColor; }
+    .ptab:hover { color: var(--text-sub); }
+    .ptab.active { color: var(--blue); border-bottom-color: var(--blue); }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ── LEZIONI CREATE grid ── */
+    .lessons-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
+    }
+    .lesson-thumb-card {
+      border-radius: 14px; overflow: hidden;
+      aspect-ratio: 4/3; cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .lesson-thumb-card:hover { transform: scale(1.02); box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+    .lesson-thumb-card svg { width: 100%; height: 100%; display: block; }
+    .lesson-thumb-card-label {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
+      color: #fff; padding: 20px 16px 16px;
+      font-size: 0.95rem; font-weight: 700;
+    }
+
+    /* ── COMPETENZE tab ── */
+    .comp-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+    .comp-header h3 { font-size: 1.1rem; font-weight: 700; }
+    .btn-add {
+      background: var(--blue); border: none; color: #fff;
+      font-family: inherit; font-size: 0.875rem; font-weight: 600;
+      padding: 9px 18px; border-radius: 9px; cursor: pointer;
+      display: flex; align-items: center; gap: 6px;
+      transition: background 0.15s; box-shadow: 0 3px 12px rgba(37,132,255,0.25);
+    }
+    .btn-add:hover { background: #1a72f0; }
+    .btn-add svg { width: 15px; height: 15px; stroke: currentColor; }
+
+    .comp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .comp-card {
+      background: var(--card-bg); border: 1px solid var(--card-border);
+      border-radius: 12px; padding: 14px 18px;
+      display: flex; align-items: center; gap: 14px;
+      transition: border-color 0.2s;
+    }
+    .comp-card:hover { border-color: rgba(37,132,255,0.3); }
+    .comp-av {
+      width: 38px; height: 38px; border-radius: 9px;
+      background: #1a3d5c; display: flex; align-items: center; justify-content: center;
+      font-size: 0.9rem; font-weight: 700; color: rgba(255,255,255,0.6); flex-shrink: 0;
+    }
+    .comp-info { flex: 1; }
+    .comp-info strong { font-size: 0.9rem; font-weight: 700; display: block; }
+    .comp-info span   { font-size: 0.78rem; color: var(--text-sub); }
+    .comp-badge {
+      font-size: 0.72rem; font-weight: 700;
+      padding: 4px 11px; border-radius: 20px;
+      background: var(--green-dim); color: var(--green);
+    }
+
+    /* ── FEEDBACK tab ── */
+    .feedback-list { display: flex; flex-direction: column; gap: 14px; }
+    .feedback-card {
+      background: var(--card-bg); border: 1px solid var(--card-border);
+      border-radius: 14px; padding: 20px 22px;
+    }
+    .feedback-top { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+    .feedback-av {
+      width: 36px; height: 36px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.85rem; font-weight: 700; color: #fff; flex-shrink: 0;
+    }
+    .feedback-av.a { background: #1a4fa8; }
+    .feedback-av.l { background: #0f6b5e; }
+    .feedback-author { font-size: 0.88rem; font-weight: 600; }
+    .feedback-date   { font-size: 0.75rem; color: var(--text-muted); margin-left: auto; }
+    .stars { display: flex; gap: 2px; margin-bottom: 8px; }
+    .stars svg { width: 14px; height: 14px; fill: #fbbf24; stroke: none; }
+    .feedback-text { font-size: 0.875rem; color: var(--text-sub); line-height: 1.6; }
+
+    /* ── MODAL ── */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0; z-index: 500;
+      background: rgba(0,0,0,0.65); backdrop-filter: blur(4px);
+      align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: #0d1f2f; border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 18px; padding: 32px 32px 28px; width: 100%; max-width: 460px;
+      position: relative; box-shadow: 0 30px 80px rgba(0,0,0,0.6);
+      animation: modalIn 0.3s cubic-bezier(.22,.68,0,1.2) both;
+    }
+    @keyframes modalIn {
+      from { opacity:0; transform:scale(.95) translateY(12px); }
+      to   { opacity:1; transform:scale(1) translateY(0); }
+    }
+    .modal-close {
+      position: absolute; top: 16px; right: 16px;
+      width: 30px; height: 30px; background: rgba(255,255,255,0.07);
+      border: none; border-radius: 50%; color: rgba(255,255,255,0.6);
+      font-size: 0.95rem; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s;
+    }
+    .modal-close:hover { background: rgba(255,255,255,0.14); color: #fff; }
+    .modal h2 { font-size: 1.25rem; font-weight: 700; margin-bottom: 24px; }
+    .modal-field { margin-bottom: 16px; }
+    .modal-field label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 8px; }
+    .modal-field select {
+      width: 100%; background: #0a1929; border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 10px; color: var(--text-main); font-family: inherit;
+      font-size: 0.92rem; padding: 12px 16px; outline: none;
+      appearance: none; -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='2' stroke='rgba(255,255,255,0.4)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='m19.5 8.25-7.5 7.5-7.5-7.5'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 14px center; background-size: 16px;
+      cursor: pointer; transition: border-color 0.2s;
+    }
+    .modal-field select:focus { border-color: rgba(37,132,255,0.7); box-shadow: 0 0 0 3px rgba(37,132,255,0.12); }
+    .modal-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
+    .modal-row-2 .modal-field { margin-bottom: 0; }
+    .btn-salva {
+      width: 100%; background: var(--blue); border: none; color: #fff;
+      font-family: inherit; font-size: 0.95rem; font-weight: 700;
+      padding: 13px; border-radius: 10px; cursor: pointer; margin-top: 4px;
+      box-shadow: 0 4px 20px rgba(37,132,255,0.30);
+      transition: background 0.18s, transform 0.12s;
+    }
+    .btn-salva:hover { background: #1a72f0; transform: translateY(-1px); }
+    .btn-salva:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .loader {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 1s ease-in-out infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--text-sub);
+    }
+  </style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="avatar" id="sidebar-av">S</div>
+    <span>SkillBridge</span>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-section-label">Menu Principale</div>
+    <a href="/dashboard" class="nav-item">
+      <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor"/><rect x="14" y="3" width="7" height="7" rx="1.5" stroke="currentColor"/><rect x="3" y="14" width="7" height="7" rx="1.5" stroke="currentColor"/><rect x="14" y="14" width="7" height="7" rx="1.5" stroke="currentColor"/></svg>
+      Dashboard
+    </a>
+    <a href="/cerca" class="nav-item">
+      <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><circle cx="11" cy="11" r="8" stroke="currentColor"/><path stroke-linecap="round" d="m21 21-4.35-4.35" stroke="currentColor"/></svg>
+      Cerca
+    </a>
+    <a href="/mie-lezioni" class="nav-item">
+      <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" stroke="currentColor"/></svg>
+      Le Mie Lezioni
+    </a>
+    <a href="/messaggi" class="nav-item">
+      <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.76c0 1.6 1.123 2.994 2.707 3.227 1.068.157 2.148.279 3.238.364.466.037.893.281 1.153.671L12 21l2.652-3.978c.26-.39.687-.634 1.153-.67 1.09-.086 2.17-.208 3.238-.365 1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" stroke="currentColor"/></svg>
+      Messaggi
+    </a>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-section-label">Account</div>
+    <a href="/profilo" class="nav-item active">
+      <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" stroke="currentColor"/></svg>
+      Profilo
+    </a>
+  </div>
+  <div class="sidebar-spacer"></div>
+  <div class="sidebar-logout">
+    <a href="/logout">
+      <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 9V5.25A2.25 2.25 0 0 1 10.5 3h6a2.25 2.25 0 0 1 2.25 2.25v13.5A2.25 2.25 0 0 1 16.5 21h-6a2.25 2.25 0 0 1-2.25-2.25V15m-3 0-3-3m0 0 3-3m-3 3H15" stroke="currentColor"/></svg>
+      Esci
+    </a>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+
+  <!-- Profile header -->
+  <div class="profile-header">
+    <div class="avatar-wrap">
+      <div class="avatar-placeholder" id="profile-av-big">M</div>
+    </div>
+
+    <div class="profile-info">
+      <div class="profile-top">
+        <h1 class="profile-name" id="profile-name">Caricamento...</h1>
+        <button class="btn-edit" onclick="openEditModal()">Modifica Profilo</button>
+        <button class="btn-settings">
+          <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" stroke="currentColor"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" stroke="currentColor"/></svg>
+        </button>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat-item"><strong id="stat-lezioni">0</strong><span>Lezioni date</span></div>
+        <div class="stat-item"><strong id="stat-comp">0</strong><span>Competenze</span></div>
+        <div class="stat-item"><strong id="stat-rating">0</strong><span>Rating</span></div>
+      </div>
+
+      <div class="profile-tagline">
+        <strong id="profile-tagline-text">Nome Cognome</strong>
+      </div>
+      <p class="profile-bio" id="profile-bio">Bio dell'utente</p>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs-bar">
+    <button class="ptab active" onclick="switchTab('lezioni', this)">
+      <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor"/><rect x="14" y="3" width="7" height="7" rx="1" stroke="currentColor"/><rect x="3" y="14" width="7" height="7" rx="1" stroke="currentColor"/><rect x="14" y="14" width="7" height="7" rx="1" stroke="currentColor"/></svg>
+      Lezioni Create
+    </button>
+    <button class="ptab" onclick="switchTab('competenze', this)">
+      <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" stroke="currentColor"/></svg>
+      Competenze
+    </button>
+    <button class="ptab" onclick="switchTab('feedback', this)">
+      <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" stroke="currentColor"/></svg>
+      Feedback
+    </button>
+  </div>
+
+  <!-- Tab: Lezioni Create -->
+  <div class="tab-panel active" id="tab-lezioni">
+    <div id="lezioni-container" class="lessons-grid">
+      <!-- Caricato da JS -->
+    </div>
+  </div>
+
+  <!-- Tab: Competenze -->
+  <div class="tab-panel" id="tab-competenze">
+    <div class="comp-header">
+      <h3>Le mie competenze</h3>
+      <button class="btn-add" onclick="openModal()">
+        <svg fill="none" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" stroke="currentColor"/></svg>
+        Aggiungi
+      </button>
+    </div>
+    <div class="comp-grid" id="comp-grid">
+      <!-- Caricato da JS -->
+    </div>
+  </div>
+
+  <!-- Tab: Feedback -->
+  <div class="tab-panel" id="tab-feedback">
+    <div class="feedback-list" id="feedback-list">
+      <!-- Caricato da JS -->
+    </div>
+  </div>
+
+</main>
+
+<!-- MODAL Modifica Profilo -->
+<div class="modal-overlay" id="modal-edit-overlay" onclick="closeEditModalOutside(event)">
+  <div class="modal">
+    <button class="modal-close" onclick="closeEditModal()">✕</button>
+    <h2>Modifica Profilo</h2>
+
+    <div class="modal-field">
+      <label for="edit-nome">Nome</label>
+      <input type="text" id="edit-nome" placeholder="Nome" />
+    </div>
+
+    <div class="modal-field">
+      <label for="edit-cognome">Cognome</label>
+      <input type="text" id="edit-cognome" placeholder="Cognome" />
+    </div>
+
+    <div class="modal-field">
+      <label for="edit-bio">Bio</label>
+      <textarea id="edit-bio" placeholder="La tua bio" style="width: 100%; background: #0a1929; border: 1px solid rgba(255,255,255,0.10); border-radius: 10px; color: #fff; font-family: inherit; font-size: 0.92rem; padding: 12px 16px; outline: none; resize: vertical; min-height: 100px; line-height: 1.5;"></textarea>
+    </div>
+
+    <button class="btn-salva" onclick="saveProfile()">Salva Profilo</button>
+  </div>
+</div>
+
+<!-- MODAL Nuova Competenza -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModalOutside(event)">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <h2>Nuova Competenza</h2>
+
+    <div class="modal-field">
+      <label>Seleziona Materia</label>
+      <select id="modal-materia">
+        <option value="" disabled selected>Scegli...</option>
+      </select>
+    </div>
+
+    <div class="modal-row-2">
+      <div class="modal-field">
+        <label>Livello</label>
+        <select id="modal-livello">
+          <option>Principiante</option>
+          <option selected>Intermedio</option>
+          <option>Avanzato</option>
+          <option>Esperto</option>
+        </select>
+      </div>
+      <div class="modal-field">
+        <label>Tipo</label>
+        <select id="modal-tipo">
+          <option selected>Offerta</option>
+          <option>Richiesta</option>
+        </select>
+      </div>
+    </div>
+
+    <button class="btn-salva" id="btn-save-comp" onclick="saveComp()">Salva Competenza</button>
+  </div>
+</div>
+
+<script>
+  let userData = null;
+
+  window.addEventListener('load', () => {
+    loadProfilo();
+  });
+
+  function loadProfilo() {
+    fetch('/api/profilo')
+      .then(r => r.json())
+      .then(data => {
+        if (data.ok) {
+          userData = data;
+          renderProfilo(data);
+          populateCompetenceSelect(data.competenze_list);
+        } else {
+          alert('Errore: ' + (data.error || 'Sconosciuto'));
+        }
+      })
+      .catch(err => {
+        console.error('Errore:', err);
+        alert('Errore nel caricamento del profilo');
+      });
+  }
+
+  function renderProfilo(data) {
+    const user = data.user;
+    const stats = data.stats;
+
+    // Avatar e nome
+    const initials = (user.nome.charAt(0) + user.cognome.charAt(0)).toUpperCase();
+    document.getElementById('profile-av-big').textContent = initials;
+    document.getElementById('sidebar-av').textContent = 'S';
+
+    // Nome completo
+    const fullName = `${user.nome} ${user.cognome}`;
+    document.getElementById('profile-name').textContent = fullName;
+    document.getElementById('profile-tagline-text').textContent = fullName;
+
+    // Bio
+    document.getElementById('profile-bio').textContent = user.descrizione_profilo || 'Bio non ancora compilata';
+
+    // Stats
+    document.getElementById('stat-lezioni').textContent = stats.lezioni_date || 0;
+    document.getElementById('stat-comp').textContent = stats.competenze || 0;
+    document.getElementById('stat-rating').textContent = (stats.media_feedback || 0).toFixed(1);
+
+    // Lezioni create
+    renderLezioni(data.lezioni_create);
+
+    // Competenze
+    renderCompetenze(data.competenze);
+
+    // Feedback
+    renderFeedback(data.feedback);
+  }
+
+  function renderLezioni(lezioni) {
+    const container = document.getElementById('lezioni-container');
+    if (lezioni.length === 0) {
+      container.innerHTML = '<div class="empty-state">Nessuna lezione creata ancora.</div>';
+      return;
+    }
+
+    container.innerHTML = lezioni.map((l, i) => `
+      <div class="lesson-thumb-card" onclick="window.location.href='/lezione/${l.id_lezione}'" style="position: relative; animation: fadeUp 0.35s both; animation-delay: ${i * 0.05}s">
+        <svg viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg">
+          <rect width="400" height="300" fill="#0f2a3f"/>
+          <ellipse cx="200" cy="100" rx="150" ry="60" fill="#1a3d5c" opacity="0.7"/>
+          <rect x="60" y="130" width="280" height="20" rx="8" fill="#1e4d6b" opacity="0.5"/>
+          <rect x="100" y="160" width="200" height="15" rx="6" fill="#1e4d6b" opacity="0.4"/>
+          <rect x="30" y="200" width="340" height="10" rx="5" fill="#1e4d6b" opacity="0.3"/>
+          <rect x="0" y="230" width="400" height="70" fill="#0a1f2f"/>
+        </svg>
+        <div class="lesson-thumb-card-label">${l.titolo}</div>
+      </div>
+    `).join('');
+  }
+
+  function renderCompetenze(competenze) {
+    const container = document.getElementById('comp-grid');
+    if (competenze.length === 0) {
+      container.innerHTML = '<div class="empty-state" style="grid-column: 1/-1;">Nessuna competenza ancora.</div>';
+      return;
+    }
+
+    container.innerHTML = competenze.map(c => `
+      <div class="comp-card">
+        <div class="comp-av">${c.nome_competenza.charAt(0).toUpperCase()}</div>
+        <div class="comp-info">
+          <strong>${c.nome_competenza}</strong>
+          <span>Livello: ${c.livello}</span>
+        </div>
+        <span class="comp-badge">${c.tipo}</span>
+      </div>
+    `).join('');
+  }
+
+  function renderFeedback(feedback) {
+    const container = document.getElementById('feedback-list');
+    if (feedback.length === 0) {
+      container.innerHTML = '<div class="empty-state">Nessun feedback ricevuto ancora.</div>';
+      return;
+    }
+
+    container.innerHTML = feedback.map((f, i) => `
+      <div class="feedback-card" style="animation: fadeUp 0.35s both; animation-delay: ${i * 0.05}s">
+        <div class="feedback-top">
+          <div class="feedback-av ${f.nome.charAt(0).toLowerCase()}">${f.nome.charAt(0).toUpperCase()}</div>
+          <div>
+            <div class="feedback-author">${f.nome} ${f.cognome}</div>
+          </div>
+          <div class="feedback-date">${f.data_feedback}</div>
+        </div>
+        <div class="stars">
+          ${Array(5).fill(0).map((_, i) => `<svg viewBox="0 0 24 24" key=${i}><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>`).join('')}
+        </div>
+        <p class="feedback-text">${f.commento || 'Nessun commento'}</p>
+      </div>
+    `).join('');
+  }
+
+  function populateCompetenceSelect(comps) {
+    const select = document.getElementById('modal-materia');
+    comps.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.id_competenza;
+      opt.textContent = c.nome_competenza;
+      select.appendChild(opt);
+    });
+  }
+
+  function switchTab(name, btn) {
+    document.querySelectorAll('.ptab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + name).classList.add('active');
+  }
+
+  function openEditModal() {
+    if (!userData) return;
+    const user = userData.user;
+    document.getElementById('edit-nome').value = user.nome;
+    document.getElementById('edit-cognome').value = user.cognome;
+    document.getElementById('edit-bio').value = user.descrizione_profilo || '';
+    document.getElementById('modal-edit-overlay').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeEditModal() {
+    document.getElementById('modal-edit-overlay').classList.remove('open');
+    document.body.style.overflow = '';
+  }
+
+  function closeEditModalOutside(e) {
+    if (e.target === document.getElementById('modal-edit-overlay')) closeEditModal();
+  }
+
+  function saveProfile() {
+    const nome = document.getElementById('edit-nome').value.trim();
+    const cognome = document.getElementById('edit-cognome').value.trim();
+    const bio = document.getElementById('edit-bio').value.trim();
+
+    if (!nome || !cognome) {
+      alert('Nome e cognome obbligatori');
+      return;
+    }
+
+    fetch('/api/profilo/aggiorna', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nome, cognome, descrizione_profilo: bio })
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.ok) {
+        alert('Profilo aggiornato!');
+        closeEditModal();
+        loadProfilo();
+      } else {
+        alert('Errore: ' + (data.error || 'Sconosciuto'));
+      }
+    });
+  }
+
+  function openModal() {
+    document.getElementById('modal-overlay').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeModal() {
+    document.getElementById('modal-overlay').classList.remove('open');
+    document.body.style.overflow = '';
+  }
+
+  function closeModalOutside(e) {
+    if (e.target === document.getElementById('modal-overlay')) closeModal();
+  }
+
+  function saveComp() {
+    const id_comp = document.getElementById('modal-materia').value;
+    const livello = document.getElementById('modal-livello').value;
+    const tipo = document.getElementById('modal-tipo').value;
+
+    if (!id_comp) {
+      alert('Seleziona una competenza');
+      return;
+    }
+
+    const btn = document.getElementById('btn-save-comp');
+    btn.disabled = true;
+    btn.innerHTML = '<div class="loader"></div> Salvataggio...';
+
+    fetch('/api/competenze/aggiungi', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id_competenza: parseInt(id_comp), livello, tipo })
+    })
+    .then(r => r.json())
+    .then(data => {
+      btn.disabled = false;
+      btn.textContent = 'Salva Competenza';
+      if (data.ok) {
+        alert('Competenza aggiunta!');
+        closeModal();
+        loadProfilo();
+      } else {
+        alert('Errore: ' + (data.error || 'Sconosciuto'));
+      }
+    });
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      closeEditModal();
+      closeModal();
+    }
+  });
+</script>
+
+<style>
+  @keyframes fadeUp {
+    from { opacity:0; transform:translateY(14px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+</style>
+
+</body>
+</html>

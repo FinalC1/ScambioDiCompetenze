@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SkillBridge – Cerca</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --sidebar-w: 240px;
+      --bg:        #060f1a;
+      --sidebar-bg:#080f18;
+      --card-bg:   #0d1f2f;
+      --card-border: rgba(255,255,255,0.07);
+      --input-bg:  #0a1929;
+      --blue:      #2584ff;
+      --blue-dim:  rgba(37,132,255,0.15);
+      --green:     #1db97b;
+      --text-main: #ffffff;
+      --text-sub:  rgba(255,255,255,0.50);
+      --text-muted:rgba(255,255,255,0.30);
+    }
+
+    html, body { height: 100%; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: radial-gradient(ellipse 80% 60% at 70% 50%, #0a2a4a 0%, var(--bg) 60%);
+      color: var(--text-main);
+      display: flex;
+      min-height: 100vh;
+    }
+
+    /* ── SIDEBAR ── */
+    .sidebar {
+      width: var(--sidebar-w);
+      min-height: 100vh;
+      background: var(--sidebar-bg);
+      border-right: 1px solid var(--card-border);
+      display: flex;
+      flex-direction: column;
+      padding: 0 0 24px;
+      position: fixed;
+      top: 0; left: 0; bottom: 0;
+      z-index: 100;
+    }
+    .sidebar-logo {
+      display: flex; align-items: center; gap: 10px;
+      padding: 20px 20px 28px;
+    }
+    .sidebar-logo .avatar {
+      width: 36px; height: 36px; background: var(--blue); border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1rem; font-weight: 700; color: #fff; flex-shrink: 0;
+      box-shadow: 0 0 0 2px rgba(37,132,255,0.35), 0 2px 8px rgba(37,132,255,0.4);
+    }
+    .sidebar-logo span { font-size: 1.1rem; font-weight: 700; }
+
+    .sidebar-section { padding: 0 12px; margin-bottom: 24px; }
+    .sidebar-section-label {
+      font-size: 0.7rem; font-weight: 600; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.08em;
+      padding: 0 8px; margin-bottom: 6px;
+    }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 12px; border-radius: 9px;
+      color: var(--text-sub); font-size: 0.9rem; font-weight: 500;
+      cursor: pointer; text-decoration: none;
+      transition: background 0.15s, color 0.15s;
+    }
+    .nav-item:hover { background: rgba(255,255,255,0.05); color: var(--text-main); }
+    .nav-item.active { background: var(--blue-dim); color: var(--blue); }
+    .nav-item svg { width: 18px; height: 18px; stroke: currentColor; flex-shrink: 0; }
+
+    .sidebar-spacer { flex: 1; }
+    .sidebar-logout { margin: 0 12px; }
+    .sidebar-logout a {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 12px; border-radius: 9px;
+      color: rgba(255,80,80,0.7); font-size: 0.9rem; font-weight: 500;
+      text-decoration: none; transition: background 0.15s, color 0.15s;
+    }
+    .sidebar-logout a:hover { background: rgba(255,80,80,0.08); color: #ff6060; }
+    .sidebar-logout svg { width: 18px; height: 18px; stroke: currentColor; }
+
+    /* ── MAIN ── */
+    .main {
+      margin-left: var(--sidebar-w);
+      flex: 1;
+      padding: 40px 48px 60px;
+    }
+
+    /* Search bar */
+    .search-bar {
+      display: flex; gap: 0;
+      background: var(--card-bg);
+      border: 1.5px solid rgba(37,132,255,0.55);
+      border-radius: 14px;
+      overflow: hidden;
+      margin-bottom: 24px;
+      box-shadow: 0 0 0 3px rgba(37,132,255,0.10);
+    }
+    .search-bar input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--text-main);
+      font-family: inherit;
+      font-size: 1rem;
+      padding: 18px 22px;
+      outline: none;
+    }
+    .search-bar input::placeholder { color: var(--text-muted); }
+    .search-bar button {
+      background: var(--blue);
+      border: none;
+      color: #fff;
+      font-family: inherit;
+      font-size: 0.95rem;
+      font-weight: 700;
+      padding: 0 30px;
+      cursor: pointer;
+      border-radius: 0 12px 12px 0;
+      transition: background 0.15s;
+    }
+    .search-bar button:hover { background: #1a72f0; }
+
+    /* Category pills */
+    .categories {
+      display: flex; gap: 8px; flex-wrap: wrap;
+      margin-bottom: 36px;
+    }
+    .cat-pill {
+      padding: 7px 18px;
+      border-radius: 20px;
+      border: 1px solid rgba(255,255,255,0.14);
+      background: transparent;
+      color: var(--text-sub);
+      font-family: inherit;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .cat-pill:hover { color: var(--text-main); border-color: rgba(255,255,255,0.28); }
+    .cat-pill.active {
+      background: var(--blue);
+      border-color: var(--blue);
+      color: #fff;
+    }
+
+    /* Skills grid */
+    .skills-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+      margin-bottom: 52px;
+    }
+
+    .skill-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 22px 22px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      transition: border-color 0.2s;
+      animation: fadeUp 0.35s both;
+    }
+    .skill-card:hover { border-color: rgba(37,132,255,0.30); }
+
+    @keyframes fadeUp {
+      from { opacity:0; transform:translateY(14px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+
+    .skill-card-top {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      margin-bottom: 18px;
+    }
+    .skill-icon {
+      width: 48px; height: 48px;
+      background: var(--blue-dim);
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .skill-icon svg { width: 24px; height: 24px; stroke: var(--blue); }
+
+    .skill-cat-badge {
+      font-size: 0.72rem; font-weight: 600;
+      padding: 4px 12px; border-radius: 20px;
+      border: 1px solid rgba(255,255,255,0.18);
+      color: var(--text-sub);
+    }
+
+    .skill-card h3 { font-size: 1.1rem; font-weight: 700; margin-bottom: 6px; }
+    .skill-card p  { font-size: 0.84rem; color: var(--text-sub); margin-bottom: 20px; flex: 1; }
+
+    .btn-vedi {
+      width: 100%;
+      background: var(--blue);
+      border: none; color: #fff;
+      font-family: inherit; font-size: 0.9rem; font-weight: 600;
+      padding: 12px; border-radius: 9px; cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+      box-shadow: 0 3px 12px rgba(37,132,255,0.25);
+      margin-bottom: 12px;
+    }
+    .btn-vedi:hover { background: #1a72f0; transform: translateY(-1px); }
+
+    .link-richiedi {
+      display: block; text-align: center;
+      color: var(--blue); font-size: 0.875rem; font-weight: 500;
+      text-decoration: none; cursor: pointer;
+      background: none; border: none; font-family: inherit; width: 100%;
+    }
+    .link-richiedi:hover { text-decoration: underline; }
+
+    /* Empty state */
+    .empty-state {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 64px 32px;
+      text-align: center;
+      margin-bottom: 52px;
+    }
+    .empty-state p { font-size: 1rem; color: var(--text-sub); margin-bottom: 12px; }
+    .empty-state a {
+      color: var(--blue); font-size: 0.875rem; font-weight: 500;
+      text-decoration: none; cursor: pointer;
+    }
+    .empty-state a:hover { text-decoration: underline; }
+
+    /* Suggestions section */
+    .section-title { font-size: 1.3rem; font-weight: 700; margin-bottom: 20px; }
+
+    .suggestions-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .sug-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      display: flex;
+      gap: 0;
+      overflow: hidden;
+      transition: border-color 0.2s;
+      animation: fadeUp 0.35s both;
+      cursor: pointer;
+    }
+    .sug-card:hover { border-color: rgba(37,132,255,0.30); }
+
+    .sug-thumb {
+      width: 130px; flex-shrink: 0;
+      position: relative; overflow: hidden;
+    }
+    .sug-thumb-placeholder {
+      width: 100%; height: 100%;
+      display: block;
+    }
+    .sug-body {
+      padding: 16px 18px;
+      flex: 1;
+      display: flex; flex-direction: column; justify-content: space-between;
+    }
+    .sug-body-top {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      margin-bottom: 6px;
+    }
+    .sug-body h4 { font-size: 0.98rem; font-weight: 700; }
+    .sug-mode {
+      font-size: 0.72rem; font-weight: 600;
+      padding: 3px 10px; border-radius: 20px;
+      background: var(--blue-dim); color: var(--blue);
+    }
+    .sug-mode.presenza { background: rgba(255,255,255,0.08); color: var(--text-sub); }
+    .sug-desc { font-size: 0.82rem; color: var(--text-sub); margin-bottom: 12px; }
+    .sug-footer {
+      display: flex; justify-content: space-between; align-items: flex-end;
+    }
+    .sug-meta { font-size: 0.78rem; color: var(--text-sub); display: flex; flex-direction: column; gap: 3px; }
+    .sug-meta span { display: flex; align-items: center; gap: 5px; }
+    .sug-meta svg { width: 12px; height: 12px; stroke: var(--text-muted); }
+    .sug-link {
+      color: var(--blue); font-size: 0.82rem; font-weight: 600;
+      text-decoration: none;
+    }
+    .sug-link:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="avatar" id="sidebar-av">S</div>
+    <span>SkillBridge</span>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-section-label">Menu Principale</div>
+    <a href="/dashboard" class="nav-item">
+      <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor"/><rect x="14" y="3" width="7" height="7" rx="1.5" stroke="currentColor"/><rect x="3" y="14" width="7" height="7" rx="1.5" stroke="currentColor"/><rect x="14" y="14" width="7" height="7" rx="1.5" stroke="currentColor"/></svg>
+      Dashboard
+    </a>
+    <a href="/cerca" class="nav-item active">
+      <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><circle cx="11" cy="11" r="8" stroke="currentColor"/><path stroke-linecap="round" d="m21 21-4.35-4.35" stroke="currentColor"/></svg>
+      Cerca
+    </a>
+    <a href="/mie-lezioni" class="nav-item">
+      <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" stroke="currentColor"/></svg>
+      Le Mie Lezioni
+    </a>
+    <a href="/messaggi" class="nav-item">
+      <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.76c0 1.6 1.123 2.994 2.707 3.227 1.068.157 2.148.279 3.238.364.466.037.893.281 1.153.671L12 21l2.652-3.978c.26-.39.687-.634 1.153-.67 1.09-.086 2.17-.208 3.238-.365 1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" stroke="currentColor"/></svg>
+      Messaggi
+    </a>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-section-label">Account</div>
+    <a href="/profilo" class="nav-item">
+      <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" stroke="currentColor"/></svg>
+      Profilo
+    </a>
+  </div>
+
+  <div class="sidebar-spacer"></div>
+
+  <div class="sidebar-logout">
+    <a href="/logout">
+      <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 9V5.25A2.25 2.25 0 0 1 10.5 3h6a2.25 2.25 0 0 1 2.25 2.25v13.5A2.25 2.25 0 0 1 16.5 21h-6a2.25 2.25 0 0 1-2.25-2.25V15m-3 0-3-3m0 0 3-3m-3 3H15" stroke="currentColor"/></svg>
+      Esci
+    </a>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+
+  <!-- Search bar -->
+  <div class="search-bar">
+    <input type="text" id="search-input" placeholder="Cosa vuoi imparare oggi? (es. Pianoforte, Python...)" />
+    <button onclick="doSearch()">Cerca</button>
+  </div>
+
+  <!-- Categories -->
+  <div class="categories" id="categories">
+    <button class="cat-pill active" data-cat="tutto" onclick="selectCat(this)">Tutto</button>
+    <button class="cat-pill" data-cat="Informatica" onclick="selectCat(this)">Informatica</button>
+    <button class="cat-pill" data-cat="Musica" onclick="selectCat(this)">Musica</button>
+    <button class="cat-pill" data-cat="Economia" onclick="selectCat(this)">Economia</button>
+    <button class="cat-pill" data-cat="Sport" onclick="selectCat(this)">Sport</button>
+    <button class="cat-pill" data-cat="Arte" onclick="selectCat(this)">Arte</button>
+    <button class="cat-pill" data-cat="Lingue" onclick="selectCat(this)">Lingue</button>
+  </div>
+
+  <!-- Results -->
+  <div id="results-area"></div>
+
+  <!-- Suggestions -->
+  <div id="suggestions-section">
+    <h2 class="section-title">Suggeriti per te</h2>
+    <div class="suggestions-grid" id="suggestions-grid">
+      <!-- Caricato da JS -->
+    </div>
+  </div>
+
+</main>
+
+<script>
+  // Sidebar avatar
+  const rawUser = (localStorage.getItem('sb_username') || '').trim();
+  const firstName = rawUser.split(/\s+/)[0];
+  const display = firstName ? firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase() : 'U';
+  document.getElementById('sidebar-av').textContent = 'S';
+
+  let currentCat = 'tutto';
+  let currentQuery = '';
+
+  // Event listeners
+  document.getElementById('search-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') doSearch();
+  });
+
+  document.getElementById('search-input').addEventListener('input', e => {
+    currentQuery = e.target.value.trim().toLowerCase();
+    render();
+  });
+
+  function selectCat(btn) {
+    document.querySelectorAll('.cat-pill').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    currentCat = btn.dataset.cat;
+    render();
+  }
+
+  function doSearch() {
+    currentQuery = document.getElementById('search-input').value.trim().toLowerCase();
+    render();
+  }
+
+  function render() {
+    fetch('/api/lezioni?q=' + encodeURIComponent(currentQuery) + '&categoria=' + encodeURIComponent(currentCat === 'tutto' ? '' : currentCat))
+      .then(r => r.json())
+      .then(data => {
+        if (data.ok) {
+          renderResults(data.lezioni);
+        } else {
+          console.error('Errore:', data.error);
+        }
+      })
+      .catch(err => console.error('Errore fetch:', err));
+  }
+
+  function renderResults(lezioni) {
+    const area = document.getElementById('results-area');
+
+    if (lezioni.length === 0) {
+      const label = currentQuery ? `"${currentQuery}"` : 'in questa categoria';
+      area.innerHTML = `
+        <div class="empty-state">
+          <p>Nessun risultato trovato per ${label}</p>
+          <a onclick="resetFilters()">Reset filtri</a>
+        </div>`;
+    } else {
+      const cards = lezioni.map((l, i) => `
+        <div class="skill-card" style="animation-delay:${i * 0.05}s" onclick="window.location.href='/lezione/${l.id_lezione}'">
+          <div class="skill-card-top">
+            <div class="skill-icon">
+              <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8">
+                <circle cx="11" cy="11" r="8" stroke="currentColor"/>
+                <path stroke-linecap="round" d="m21 21-4.35-4.35" stroke="currentColor"/>
+              </svg>
+            </div>
+            <span class="skill-cat-badge">${l.categoria || 'Lezione'}</span>
+          </div>
+          <h3>${l.titolo}</h3>
+          <p>${l.descrizione}</p>
+          <button class="btn-vedi">Vedi Lezione</button>
+          <a class="link-richiedi" href="/lezione/${l.id_lezione}">Dettagli →</a>
+        </div>`).join('');
+
+      area.innerHTML = `<div class="skills-grid">${cards}</div>`;
+    }
+
+    // Mostra/nascondi suggerimenti
+    document.getElementById('suggestions-section').style.display =
+      (currentCat === 'tutto' && !currentQuery) ? 'block' : 'none';
+  }
+
+  function resetFilters() {
+    currentQuery = '';
+    currentCat = 'tutto';
+    document.getElementById('search-input').value = '';
+    document.querySelectorAll('.cat-pill').forEach(p => p.classList.remove('active'));
+    document.querySelector('[data-cat="tutto"]').classList.add('active');
+    render();
+  }
+
+  // Carica suggerimenti
+  function loadSuggestions() {
+    fetch('/api/lezioni?q=&categoria=')
+      .then(r => r.json())
+      .then(data => {
+        if (data.ok && data.lezioni.length > 0) {
+          const lezioni = data.lezioni.slice(0, 2);
+          const grid = document.getElementById('suggestions-grid');
+          grid.innerHTML = lezioni.map(l => `
+            <div class="sug-card" onclick="window.location.href='/lezione/${l.id_lezione}'">
+              <div class="sug-thumb">
+                <svg class="sug-thumb-placeholder" viewBox="0 0 130 140" xmlns="http://www.w3.org/2000/svg">
+                  <rect width="130" height="140" fill="#0f2a3f"/>
+                  <rect x="0" y="0" width="130" height="70" fill="#0d2235" opacity="0.9"/>
+                  <ellipse cx="65" cy="35" rx="50" ry="20" fill="#1a3d5c" opacity="0.5"/>
+                  <rect x="0" y="70" width="130" height="70" fill="#0a1e2f"/>
+                  <line x1="0" y1="140" x2="130" y2="0" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+                  <line x1="130" y1="140" x2="0" y2="0" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+                </svg>
+              </div>
+              <div class="sug-body">
+                <div>
+                  <div class="sug-body-top">
+                    <h4>${l.titolo}</h4>
+                    <span class="sug-mode">${l.modalita}</span>
+                  </div>
+                  <p class="sug-desc">${l.descrizione}</p>
+                </div>
+                <div class="sug-footer">
+                  <div class="sug-meta">
+                    <span><svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75" stroke="currentColor"/></svg>${l.data_lezione}</span>
+                    <span><svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" stroke="currentColor"/></svg>${l.orario}</span>
+                  </div>
+                  <a class="sug-link" href="/lezione/${l.id_lezione}">Dettagli</a>
+                </div>
+              </div>
+            </div>
+          `).join('');
+        }
+      })
+      .catch(err => console.error('Errore caricamento suggerimenti:', err));
+  }
+
+  // Carica al load
+  window.addEventListener('load', () => {
+    render();
+    loadSuggestions();
+  });
+</script>
+
+</body>
+</html>

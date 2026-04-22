@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SkillBridge – Le Mie Lezioni</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --sidebar-w: 240px;
+      --bg:        #060f1a;
+      --sidebar-bg:#080f18;
+      --card-bg:   #0d1f2f;
+      --card-border: rgba(255,255,255,0.07);
+      --input-bg:  #0a1929;
+      --blue:      #2584ff;
+      --blue-dim:  rgba(37,132,255,0.15);
+      --green:     #1db97b;
+      --text-main: #ffffff;
+      --text-sub:  rgba(255,255,255,0.50);
+      --text-muted:rgba(255,255,255,0.28);
+    }
+
+    html, body { height: 100%; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: radial-gradient(ellipse 80% 60% at 70% 50%, #0a2a4a 0%, var(--bg) 60%);
+      color: var(--text-main);
+      display: flex;
+      min-height: 100vh;
+    }
+
+    /* ── SIDEBAR ── */
+    .sidebar {
+      width: var(--sidebar-w);
+      min-height: 100vh;
+      background: var(--sidebar-bg);
+      border-right: 1px solid var(--card-border);
+      display: flex; flex-direction: column;
+      padding: 0 0 24px;
+      position: fixed; top: 0; left: 0; bottom: 0;
+      z-index: 100;
+    }
+    .sidebar-logo {
+      display: flex; align-items: center; gap: 10px;
+      padding: 20px 20px 28px;
+    }
+    .sidebar-logo .avatar {
+      width: 36px; height: 36px; background: var(--blue); border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1rem; font-weight: 700; color: #fff; flex-shrink: 0;
+      box-shadow: 0 0 0 2px rgba(37,132,255,0.35), 0 2px 8px rgba(37,132,255,0.4);
+    }
+    .sidebar-logo span { font-size: 1.1rem; font-weight: 700; }
+
+    .sidebar-section { padding: 0 12px; margin-bottom: 24px; }
+    .sidebar-section-label {
+      font-size: 0.7rem; font-weight: 600; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.08em;
+      padding: 0 8px; margin-bottom: 6px;
+    }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 12px; border-radius: 9px;
+      color: var(--text-sub); font-size: 0.9rem; font-weight: 500;
+      text-decoration: none; transition: background 0.15s, color 0.15s;
+    }
+    .nav-item:hover { background: rgba(255,255,255,0.05); color: var(--text-main); }
+    .nav-item.active { background: var(--blue-dim); color: var(--blue); }
+    .nav-item svg { width: 18px; height: 18px; stroke: currentColor; flex-shrink: 0; }
+
+    .sidebar-spacer { flex: 1; }
+    .sidebar-logout { margin: 0 12px; }
+    .sidebar-logout a {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 12px; border-radius: 9px;
+      color: rgba(255,80,80,0.7); font-size: 0.9rem; font-weight: 500;
+      text-decoration: none; transition: background 0.15s, color 0.15s;
+    }
+    .sidebar-logout a:hover { background: rgba(255,80,80,0.08); color: #ff6060; }
+    .sidebar-logout svg { width: 18px; height: 18px; stroke: currentColor; }
+
+    /* ── MAIN ── */
+    .main {
+      margin-left: var(--sidebar-w);
+      flex: 1; padding: 40px 48px 60px;
+    }
+
+    .page-title { font-size: 2rem; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 6px; }
+    .page-sub   { font-size: 0.93rem; color: var(--text-sub); margin-bottom: 32px; }
+
+    /* Toggle tabs */
+    .toggle-tabs {
+      display: inline-flex;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 4px;
+      margin-bottom: 32px;
+    }
+    .toggle-tab {
+      padding: 9px 28px;
+      border-radius: 9px;
+      border: none; background: transparent;
+      color: var(--text-sub); font-family: inherit;
+      font-size: 0.9rem; font-weight: 600;
+      cursor: pointer; transition: background 0.15s, color 0.15s;
+    }
+    .toggle-tab.active {
+      background: rgba(255,255,255,0.10);
+      color: var(--text-main);
+    }
+
+    /* Lesson list */
+    .lesson-list { display: flex; flex-direction: column; gap: 16px; }
+
+    .lesson-row {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      display: flex; align-items: center; gap: 20px;
+      padding: 16px 20px 16px 16px;
+      transition: border-color 0.2s;
+      animation: fadeUp 0.35s both;
+      text-decoration: none; color: inherit;
+    }
+    .lesson-row:hover { border-color: rgba(37,132,255,0.35); }
+
+    @keyframes fadeUp {
+      from { opacity:0; transform:translateY(12px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+
+    .lesson-thumb {
+      width: 90px; height: 68px;
+      border-radius: 10px; overflow: hidden; flex-shrink: 0;
+    }
+    .lesson-thumb svg { width: 100%; height: 100%; display: block; }
+
+    .lesson-info { flex: 1; }
+
+    .lesson-badges {
+      display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+    }
+    .badge-cat {
+      font-size: 0.72rem; font-weight: 600;
+      padding: 3px 11px; border-radius: 20px;
+      background: var(--blue-dim); color: var(--blue);
+    }
+    .badge-mode {
+      font-size: 0.72rem; font-weight: 600;
+      padding: 3px 11px; border-radius: 20px;
+      border: 1px solid rgba(255,255,255,0.16);
+      color: var(--text-sub);
+    }
+
+    .lesson-name {
+      font-size: 1.1rem; font-weight: 700; margin-bottom: 10px;
+    }
+
+    .lesson-meta-row {
+      display: flex; align-items: center; gap: 22px;
+      flex-wrap: wrap;
+    }
+    .lesson-meta-row span {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 0.82rem; color: var(--text-sub);
+    }
+    .lesson-meta-row svg { width: 14px; height: 14px; stroke: var(--text-muted); flex-shrink: 0; }
+
+    .role-tag {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 0.82rem; color: var(--text-sub);
+    }
+    .role-tag svg { width: 14px; height: 14px; stroke: var(--text-muted); }
+    .role-tag.teacher { color: var(--blue); }
+    .role-tag.teacher svg { stroke: var(--blue); }
+
+    .btn-detail {
+      background: var(--blue); border: none; color: #fff;
+      font-family: inherit; font-size: 0.85rem; font-weight: 600;
+      padding: 10px 20px; border-radius: 9px; cursor: pointer;
+      white-space: nowrap; flex-shrink: 0;
+      transition: background 0.15s, transform 0.1s;
+      box-shadow: 0 3px 12px rgba(37,132,255,0.25);
+    }
+    .btn-detail:hover { background: #1a72f0; transform: translateY(-1px); }
+
+    /* Empty state */
+    .empty {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 60px 32px;
+      text-align: center;
+      color: var(--text-sub);
+      font-size: 0.93rem;
+    }
+    .empty svg { width: 40px; height: 40px; stroke: var(--text-muted); margin: 0 auto 14px; display: block; }
+  </style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="avatar" id="sidebar-av">S</div>
+    <span>SkillBridge</span>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-section-label">Menu Principale</div>
+    <a href="/dashboard" class="nav-item">
+      <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor"/><rect x="14" y="3" width="7" height="7" rx="1.5" stroke="currentColor"/><rect x="3" y="14" width="7" height="7" rx="1.5" stroke="currentColor"/><rect x="14" y="14" width="7" height="7" rx="1.5" stroke="currentColor"/></svg>
+      Dashboard
+    </a>
+    <a href="/cerca" class="nav-item">
+      <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><circle cx="11" cy="11" r="8" stroke="currentColor"/><path stroke-linecap="round" d="m21 21-4.35-4.35" stroke="currentColor"/></svg>
+      Cerca
+    </a>
+    <a href="/mie-lezioni" class="nav-item active">
+      <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" stroke="currentColor"/></svg>
+      Le Mie Lezioni
+    </a>
+    <a href="/messaggi" class="nav-item">
+      <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.76c0 1.6 1.123 2.994 2.707 3.227 1.068.157 2.148.279 3.238.364.466.037.893.281 1.153.671L12 21l2.652-3.978c.26-.39.687-.634 1.153-.67 1.09-.086 2.17-.208 3.238-.365 1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" stroke="currentColor"/></svg>
+      Messaggi
+    </a>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-section-label">Account</div>
+    <a href="/profilo" class="nav-item">
+      <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" stroke="currentColor"/></svg>
+      Profilo
+    </a>
+  </div>
+
+  <div class="sidebar-spacer"></div>
+
+  <div class="sidebar-logout">
+    <a href="/login" >
+      <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 9V5.25A2.25 2.25 0 0 1 10.5 3h6a2.25 2.25 0 0 1 2.25 2.25v13.5A2.25 2.25 0 0 1 16.5 21h-6a2.25 2.25 0 0 1-2.25-2.25V15m-3 0-3-3m0 0 3-3m-3 3H15" stroke="currentColor"/></svg>
+      Esci
+    </a>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+
+  <h1 class="page-title">Le Mie Lezioni</h1>
+  <p class="page-sub">Gestisci le lezioni che tieni e quelle a cui partecipi.</p>
+
+  <!-- Toggle -->
+  <div class="toggle-tabs">
+    <button class="toggle-tab active" id="tab-freq" onclick="switchTab('frequentando')">Sto Frequentando</button>
+    <button class="toggle-tab"        id="tab-ins"  onclick="switchTab('insegnando')">Sto Insegnando</button>
+  </div>
+
+  <!-- Lists -->
+  <div class="lesson-list" id="list-frequentando"></div>
+  <div class="lesson-list" id="list-insegnando"   style="display:none"></div>
+
+</main>
+
+<script>
+  window.addEventListener('load', () => {
+    loadMieLezioni();
+  });
+
+  const rawUser = (localStorage.getItem('sb_username') || '').trim();
+  const firstName = rawUser.split(/\s+/)[0];
+  const displayName = firstName ? firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase() : 'U';
+  document.getElementById('sidebar-av').textContent = 'S';
+
+  function loadMieLezioni() {
+    fetch('/api/mie-lezioni')
+      .then(r => r.json())
+      .then(data => {
+        if (data.ok) {
+          renderTab('frequentando', data.frequentando);
+          renderTab('insegnando', data.insegnando);
+        }
+      })
+      .catch(err => console.error('Errore:', err));
+  }
+
+  function renderTab(tabName, lessons) {
+    const container = document.getElementById(`list-${tabName}`);
+    if (lessons.length === 0) {
+      container.innerHTML = '<div class="empty"><svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" stroke="currentColor"/></svg>Nessuna lezione.</div>';
+      return;
+    }
+
+    container.innerHTML = lessons.map((l, i) => `
+      <div class="lesson-row" style="animation-delay:${i*0.07}s">
+        <div class="lesson-thumb">
+          <svg viewBox="0 0 90 68" xmlns="http://www.w3.org/2000/svg">
+            <rect width="90" height="68" fill="#0f2a3f"/>
+            <g stroke="rgba(255,255,255,0.07)" stroke-width="0.8" fill="none">
+              <line x1="0" y1="68" x2="45" y2="0"/><line x1="90" y1="68" x2="45" y2="0"/>
+              <line x1="0" y1="34" x2="90" y2="34"/>
+            </g>
+          </svg>
+        </div>
+        <div class="lesson-info">
+          <div class="lesson-badges">
+            <span class="badge-cat">${l.categoria || 'Lezione'}</span>
+            <span class="badge-mode">${l.modalita}</span>
+          </div>
+          <div class="lesson-name">${l.titolo}</div>
+          <div class="lesson-meta-row">
+            <span>
+              <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75" stroke="currentColor"/></svg>
+              ${l.data_lezione}
+            </span>
+            <span>
+              <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" stroke="currentColor"/></svg>
+              ${l.orario}
+            </span>
+            ${l.nome_insegnante ? `<span class="role-tag">
+              <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" stroke="currentColor"/></svg>
+              ${l.nome_insegnante}
+            </span>` : ''}
+          </div>
+        </div>
+        <button class="btn-detail" onclick="window.location.href='/lezione/${l.id_lezione}'">Vedi</button>
+      </div>
+    `).join('');
+  }
+
+  function switchTab(tabName) {
+    document.querySelectorAll('.toggle-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.lesson-list').forEach(l => l.style.display = 'none');
+    const tabId = tabName === 'insegnando' ? 'tab-ins' : 'tab-freq';
+    document.getElementById(tabId).classList.add('active');
+    document.getElementById(`list-${tabName}`).style.display = 'flex';
+  }
+</script>
+
+</body>
+</html>

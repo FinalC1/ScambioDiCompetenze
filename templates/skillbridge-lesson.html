@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SkillBridge – Dettagli Lezione</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:         #060f1a;
+      --card-bg:    #0d1f2f;
+      --card-border:rgba(255,255,255,0.07);
+      --input-bg:   #0a1929;
+      --blue:       #2584ff;
+      --blue-dim:   rgba(37,132,255,0.15);
+      --green:      #1db97b;
+      --text-main:  #ffffff;
+      --text-sub:   rgba(255,255,255,0.50);
+      --text-muted: rgba(255,255,255,0.30);
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: radial-gradient(ellipse 80% 60% at 70% 50%, #0a2a4a 0%, var(--bg) 60%);
+      color: var(--text-main);
+      min-height: 100vh;
+      padding: 32px 48px 60px;
+    }
+
+    /* Back link */
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--blue);
+      font-size: 0.9rem;
+      font-weight: 500;
+      text-decoration: none;
+      margin-bottom: 32px;
+      transition: gap 0.15s;
+    }
+    .back-link:hover { gap: 10px; }
+    .back-link svg { width: 16px; height: 16px; stroke: currentColor; }
+
+    /* Layout */
+    .layout {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 32px;
+      align-items: start;
+      max-width: 1200px;
+    }
+
+    /* LEFT COLUMN */
+    .left {}
+
+    /* Badges */
+    .badges {
+      display: flex; gap: 8px;
+      margin-bottom: 16px;
+    }
+    .badge {
+      font-size: 0.78rem; font-weight: 600;
+      padding: 4px 13px; border-radius: 20px;
+    }
+    .badge.blue  { background: var(--blue-dim); color: var(--blue); }
+    .badge.ghost { background: transparent; border: 1px solid rgba(255,255,255,0.22); color: var(--text-sub); }
+
+    .left h1 {
+      font-size: 2.2rem; font-weight: 800;
+      letter-spacing: -0.03em; margin-bottom: 10px;
+    }
+    .left .desc {
+      font-size: 1rem; color: var(--text-sub);
+      margin-bottom: 24px; line-height: 1.6;
+    }
+
+    /* Hero image */
+    .hero {
+      position: relative;
+      width: 100%; height: 390px;
+      border-radius: 16px;
+      overflow: hidden;
+      margin-bottom: 32px;
+    }
+    .hero-bg {
+      width: 100%; height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .hero-placeholder {
+      width: 100%; height: 100%;
+      background: linear-gradient(160deg, #0f2a3f 0%, #1a3d5c 40%, #0a1e2e 100%);
+    }
+    .hero-svg {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+    }
+    .hero-overlay {
+      position: absolute; inset: 0;
+      background: linear-gradient(to top, rgba(6,15,26,0.85) 0%, rgba(6,15,26,0.20) 50%, transparent 100%);
+    }
+    .hero-date {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      text-align: center;
+      padding: 28px 20px 32px;
+    }
+    .hero-date .label {
+      font-size: 0.85rem; color: rgba(255,255,255,0.7);
+      margin-bottom: 6px; display: block;
+    }
+    .hero-date .value {
+      font-size: 1.75rem; font-weight: 800;
+      letter-spacing: -0.02em; color: #fff;
+    }
+
+    /* Tabs */
+    .tabs {
+      display: flex; gap: 4px;
+      margin-bottom: 24px;
+    }
+    .tab {
+      padding: 9px 20px;
+      border-radius: 9px;
+      font-size: 0.88rem; font-weight: 600;
+      cursor: pointer; border: none;
+      font-family: inherit;
+      background: transparent;
+      color: var(--text-sub);
+      transition: background 0.15s, color 0.15s;
+    }
+    .tab.active {
+      background: rgba(255,255,255,0.10);
+      color: var(--text-main);
+    }
+    .tab:hover:not(.active) { color: var(--text-main); }
+
+    /* Tab panels */
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* Cosa imparerai */
+    .learn-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 28px;
+      margin-bottom: 20px;
+    }
+    .learn-card h3 {
+      font-size: 1.15rem; font-weight: 700;
+      margin-bottom: 18px;
+    }
+    .learn-list { list-style: none; }
+    .learn-list li {
+      display: flex; align-items: center; gap: 12px;
+      font-size: 0.92rem; color: var(--text-sub);
+      padding: 7px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .learn-list li:last-child { border-bottom: none; }
+    .learn-list li svg {
+      width: 16px; height: 16px;
+      stroke: var(--green); flex-shrink: 0;
+    }
+
+    /* Materiali tab */
+    .material-item {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin-bottom: 12px;
+      display: flex; align-items: center; gap: 14px;
+    }
+    .material-icon {
+      width: 40px; height: 40px;
+      border-radius: 9px;
+      background: var(--blue-dim);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .material-icon svg { width: 20px; height: 20px; stroke: var(--blue); }
+    .material-info strong { font-size: 0.9rem; font-weight: 600; display: block; }
+    .material-info span   { font-size: 0.78rem; color: var(--text-sub); }
+    .material-dl {
+      margin-left: auto;
+      color: var(--blue); font-size: 0.82rem; font-weight: 500;
+      text-decoration: none;
+    }
+
+    /* Partecipanti tab */
+    .participant {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .participant:last-child { border-bottom: none; }
+    .part-av {
+      width: 38px; height: 38px; border-radius: 50%;
+      background: var(--blue-dim);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.85rem; font-weight: 700; color: var(--blue);
+      flex-shrink: 0;
+    }
+    .part-name { font-size: 0.9rem; font-weight: 500; }
+    .part-role { font-size: 0.78rem; color: var(--text-sub); }
+
+    /* RIGHT COLUMN */
+    .right {}
+
+    .info-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 24px;
+      position: sticky;
+      top: 32px;
+    }
+
+    /* Teacher */
+    .teacher {
+      display: flex; align-items: center; gap: 14px;
+      margin-bottom: 22px;
+      padding-bottom: 22px;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+    }
+    .teacher-av {
+      width: 50px; height: 50px; border-radius: 50%;
+      background: #1a3d5c;
+      overflow: hidden; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .teacher-av svg { width: 26px; height: 26px; stroke: rgba(255,255,255,0.4); }
+    .teacher-name { font-size: 1rem; font-weight: 700; }
+    .teacher-role { font-size: 0.78rem; color: var(--blue); font-weight: 500; }
+
+    /* Meta rows */
+    .meta-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 11px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .meta-row:last-of-type { border-bottom: none; margin-bottom: 4px; }
+    .meta-label {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 0.875rem; color: var(--text-sub);
+    }
+    .meta-label svg { width: 16px; height: 16px; stroke: var(--text-muted); }
+    .meta-value { font-size: 0.875rem; font-weight: 700; }
+
+    /* Buttons */
+    .btn-book {
+      width: 100%; background: var(--blue); border: none;
+      color: #fff; font-family: inherit; font-size: 0.95rem; font-weight: 700;
+      padding: 15px; border-radius: 11px; cursor: pointer; margin-top: 20px;
+      box-shadow: 0 4px 20px rgba(37,132,255,0.35);
+      transition: background 0.18s, transform 0.12s;
+    }
+    .btn-book:hover { background: #1a72f0; transform: translateY(-1px); }
+
+    .btn-contact {
+      width: 100%; background: transparent;
+      border: 1px solid rgba(255,255,255,0.12);
+      color: var(--text-main); font-family: inherit; font-size: 0.9rem; font-weight: 600;
+      padding: 13px; border-radius: 11px; cursor: pointer; margin-top: 10px;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      transition: background 0.15s;
+    }
+    .btn-contact:hover { background: rgba(255,255,255,0.06); }
+    .btn-contact svg { width: 17px; height: 17px; stroke: currentColor; }
+
+    .tos-note {
+      font-size: 0.73rem; color: var(--text-muted);
+      text-align: center; margin-top: 14px; line-height: 1.5;
+    }
+
+    .btn-book.booked {
+      background: #1db97b;
+      box-shadow: 0 4px 20px rgba(29,185,123,0.35);
+      cursor: default;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .btn-book.booked:hover { background: #1db97b; transform: none; }
+
+    .btn-teacher {
+      width: 100%; background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: var(--text-sub); font-family: inherit; font-size: 0.95rem; font-weight: 600;
+      padding: 15px; border-radius: 11px; cursor: default; margin-top: 20px;
+      display: flex; align-items: center; justify-content: center; gap: 9px;
+    }
+    .btn-teacher svg { width: 18px; height: 18px; stroke: currentColor; }
+
+    .cancel-link {
+      display: block; text-align: center; margin-top: 10px;
+      font-size: 0.8rem; color: rgba(255,80,80,0.6);
+      cursor: pointer; text-decoration: underline;
+      background: none; border: none; font-family: inherit;
+      width: 100%;
+    }
+    .cancel-link:hover { color: #ff6060; }
+
+    /* Toast */
+    .toast {
+      position: fixed; bottom: 32px; right: 32px;
+      background: #0d1f2f;
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 14px;
+      padding: 18px 22px;
+      min-width: 280px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+      transform: translateY(20px);
+      opacity: 0;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+      pointer-events: none;
+      z-index: 999;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
+    .toast-title { font-size: 0.95rem; font-weight: 700; margin-bottom: 4px; }
+    .toast-body  { font-size: 0.83rem; color: var(--text-sub); }
+
+    .loader {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(255,255,255,0.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 1s ease-in-out infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+
+  <a href="/dashboard" class="back-link">
+    <svg fill="none" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" stroke="currentColor"/></svg>
+    Torna alla dashboard
+  </a>
+
+  <div class="layout">
+
+    <!-- LEFT -->
+    <div class="left">
+      <div class="badges" id="badges-container">
+        <!-- Badge caricate da JS -->
+      </div>
+
+      <h1 id="lesson-title">Caricamento...</h1>
+      <p class="desc" id="lesson-desc">Caricamento...</p>
+
+      <!-- Hero -->
+      <div class="hero">
+        <div class="hero-placeholder"></div>
+        <svg class="hero-svg" viewBox="0 0 890 390" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+          <g stroke="rgba(255,255,255,0.07)" stroke-width="1" fill="none">
+            <line x1="0" y1="390" x2="445" y2="0"/>
+            <line x1="890" y1="390" x2="445" y2="0"/>
+            <line x1="0" y1="390" x2="890" y2="0"/>
+            <line x1="890" y1="390" x2="0" y2="0"/>
+            <line x1="222" y1="390" x2="445" y2="0"/>
+            <line x1="668" y1="390" x2="445" y2="0"/>
+            <line x1="0" y1="195" x2="890" y2="195"/>
+            <line x1="0" y1="130" x2="890" y2="130"/>
+            <line x1="0" y1="260" x2="890" y2="260"/>
+            <line x1="0" y1="65" x2="890" y2="65"/>
+          </g>
+          <g stroke="rgba(255,255,255,0.06)" stroke-width="1.5" fill="none">
+            <path d="M 0 390 Q 222 200 445 390"/>
+            <path d="M 445 390 Q 668 200 890 390"/>
+            <path d="M 0 390 Q 445 50 890 390"/>
+            <path d="M 100 390 Q 445 120 780 390"/>
+          </g>
+          <g fill="rgba(255,255,255,0.08)">
+            <circle cx="445" cy="0" r="3"/>
+            <circle cx="445" cy="195" r="2.5"/>
+            <circle cx="222" cy="195" r="2"/>
+            <circle cx="668" cy="195" r="2"/>
+          </g>
+        </svg>
+        <div class="hero-overlay"></div>
+        <div class="hero-date">
+          <span class="label">Questa lezione sarà tenuta il</span>
+          <span class="value" id="hero-date">Caricamento...</span>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab('panoramica', this)">Panoramica</button>
+        <button class="tab" onclick="switchTab('materiali', this)">Materiali</button>
+        <button class="tab" onclick="switchTab('partecipanti', this)">Partecipanti</button>
+      </div>
+
+      <!-- Tab: Panoramica -->
+      <div class="tab-panel active" id="tab-panoramica">
+        <div class="learn-card">
+          <h3>Cosa imparerai</h3>
+          <ul class="learn-list" id="learn-list">
+            <li><svg fill="none" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" stroke="currentColor"/></svg>Caricamento...</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Tab: Materiali -->
+      <div class="tab-panel" id="tab-materiali">
+        <div id="materiali-container">
+          <!-- Materiali caricati da JS -->
+        </div>
+      </div>
+
+      <!-- Tab: Partecipanti -->
+      <div class="tab-panel" id="tab-partecipanti">
+        <div class="learn-card">
+          <h3>Partecipanti iscritti</h3>
+          <div id="partecipanti-container">
+            <!-- Partecipanti caricati da JS -->
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT -->
+    <div class="right">
+      <div class="info-card">
+
+        <!-- Teacher -->
+        <div class="teacher">
+          <div class="teacher-av">
+            <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" stroke="currentColor"/></svg>
+          </div>
+          <div>
+            <div class="teacher-name" id="teacher-name">Caricamento...</div>
+            <div class="teacher-role">Insegnante Verificato</div>
+          </div>
+        </div>
+
+        <!-- Meta -->
+        <div class="meta-row">
+          <span class="meta-label">
+            <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" stroke="currentColor"/></svg>
+            Data
+          </span>
+          <span class="meta-value" id="meta-data">--</span>
+        </div>
+        <div class="meta-row">
+          <span class="meta-label">
+            <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" stroke="currentColor"/></svg>
+            Orario
+          </span>
+          <span class="meta-value" id="meta-orario">--</span>
+        </div>
+        <div class="meta-row">
+          <span class="meta-label">
+            <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" stroke="currentColor"/></svg>
+            Posti
+          </span>
+          <span class="meta-value" id="meta-posti">--</span>
+        </div>
+        <div class="meta-row">
+          <span class="meta-label">
+            <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" stroke="currentColor"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" stroke="currentColor"/></svg>
+            Luogo
+          </span>
+          <span class="meta-value" id="meta-luogo">--</span>
+        </div>
+
+        <!-- Action area -->
+        <div id="action-area"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast">
+    <div class="toast-title">Successo!</div>
+    <div class="toast-body">Prenotazione confermata con successo!</div>
+  </div>
+
+  <script>
+    // Estrai ID lezione dall'URL
+    const lessonId = parseInt(window.location.pathname.split('/').pop());
+
+    window.addEventListener('load', () => {
+      loadLesson();
+    });
+
+    function loadLesson() {
+      fetch(`/api/lezioni/${lessonId}`)
+        .then(r => r.json())
+        .then(data => {
+          if (data.ok) {
+            renderLesson(data);
+          } else {
+            alert('Errore: ' + (data.error || 'Lezione non trovata'));
+            window.location.href = '/dashboard';
+          }
+        })
+        .catch(err => {
+          console.error('Errore:', err);
+          alert('Errore nel caricamento della lezione');
+          window.location.href = '/dashboard';
+        });
+    }
+
+    function renderLesson(data) {
+      const l = data.lezione;
+
+      // Titolo e descrizione
+      document.getElementById('lesson-title').textContent = l.titolo;
+      document.getElementById('lesson-desc').textContent = l.descrizione;
+
+      // Data e ora hero
+      document.getElementById('hero-date').textContent = `${l.data_lezione} alle ${l.orario}`;
+
+      // Badge
+      const badgesHtml = `
+        <span class="badge blue">${l.categoria || 'Lezione'}</span>
+        <span class="badge ghost">${l.modalita}</span>
+      `;
+      document.getElementById('badges-container').innerHTML = badgesHtml;
+
+      // Meta
+      document.getElementById('meta-data').textContent = l.data_lezione;
+      document.getElementById('meta-orario').textContent = l.orario;
+      document.getElementById('meta-posti').textContent = `${data.posti_disponibili} disponibili`;
+      document.getElementById('meta-luogo').textContent = l.luogo;
+
+      // Teacher
+      document.getElementById('teacher-name').textContent = l.nome_insegnante;
+
+      // Cosa imparerai (dividiamo la descrizione in punti)
+      const points = l.descrizione.split('\n').filter(p => p.trim());
+      const learnHtml = points.length > 0 
+        ? points.map(p => `<li><svg fill="none" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" stroke="currentColor"/></svg>${p}</li>`).join('')
+        : '<li><svg fill="none" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" stroke="currentColor"/></svg>Impara contenuti interessanti</li>';
+      document.getElementById('learn-list').innerHTML = learnHtml;
+
+      // Materiali
+      const materialiHtml = data.materiali.length > 0
+        ? data.materiali.map(m => `
+            <div class="material-item">
+              <div class="material-icon">
+                <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" stroke="currentColor"/></svg>
+              </div>
+              <div class="material-info">
+                <strong>${m.nome_materiale}</strong>
+                <span>${m.tipo || 'Materiale'}</span>
+              </div>
+              <a href="#" class="material-dl">Scarica</a>
+            </div>
+          `).join('')
+        : '<p style="color: var(--text-sub); font-size: 0.9rem;">Nessun materiale disponibile.</p>';
+      document.getElementById('materiali-container').innerHTML = materialiHtml;
+
+      // Partecipanti
+      const partecipantiHtml = data.partecipanti.length > 0
+        ? data.partecipanti.map(p => `
+            <div class="participant">
+              <div class="part-av">${p.nome.charAt(0).toUpperCase()}</div>
+              <div>
+                <div class="part-name">${p.nome} ${p.cognome}</div>
+                <div class="part-role">Partecipante</div>
+              </div>
+            </div>
+          `).join('')
+        : '<p style="color: var(--text-sub); font-size: 0.9rem;">Nessun partecipante ancora.</p>';
+      document.getElementById('partecipanti-container').innerHTML = partecipantiHtml;
+
+      // Pulsante azione
+      renderActionButton(data);
+    }
+
+    function renderActionButton(data) {
+      const area = document.getElementById('action-area');
+      
+      if (data.is_teacher) {
+        area.innerHTML = `
+          <button class="btn-teacher" disabled>
+            <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 3.741-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5" stroke="currentColor"/></svg>
+            Sei l'insegnante di questa lezione
+          </button>`;
+      } else if (data.is_booked) {
+        area.innerHTML = `
+          <button class="btn-book booked" disabled>
+            <svg fill="none" viewBox="0 0 24 24" stroke-width="2.5" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" stroke="currentColor"/></svg>
+            Prenotato
+          </button>
+          <button class="btn-contact" onclick="contactTeacher()">
+            <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.76c0 1.6 1.123 2.994 2.707 3.227 1.068.157 2.148.279 3.238.364.466.037.893.281 1.153.671L12 21l2.652-3.978c.26-.39.687-.634 1.153-.67 1.09-.086 2.17-.208 3.238-.365 1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" stroke="currentColor"/></svg>
+            Contatta Insegnante
+          </button>
+          <button class="cancel-link" onclick="cancelBooking()">Annulla prenotazione</button>`;
+      } else {
+        area.innerHTML = `
+          <button class="btn-book" onclick="bookLesson()">Prenota il tuo posto</button>
+          <button class="btn-contact" onclick="contactTeacher()">
+            <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.76c0 1.6 1.123 2.994 2.707 3.227 1.068.157 2.148.279 3.238.364.466.037.893.281 1.153.671L12 21l2.652-3.978c.26-.39.687-.634 1.153-.67 1.09-.086 2.17-.208 3.238-.365 1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" stroke="currentColor"/></svg>
+            Contatta Insegnante
+          </button>
+          <p class="tos-note">Prenotando confermi di aver letto il codice di condotta SkillBridge.</p>`;
+      }
+    }
+
+    function switchTab(name, btn) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('tab-' + name).classList.add('active');
+    }
+
+    function showToast(title, body) {
+      const t = document.getElementById('toast');
+      t.querySelector('.toast-title').textContent = title;
+      t.querySelector('.toast-body').textContent = body;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 3500);
+    }
+
+    function bookLesson() {
+      fetch(`/api/lezioni/${lessonId}/prenota`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'}
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.ok) {
+          showToast('Successo!', 'Prenotazione confermata con successo!');
+          setTimeout(() => loadLesson(), 1000);
+        } else {
+          alert(data.error || 'Errore');
+        }
+      });
+    }
+
+    function cancelBooking() {
+      if (confirm('Sei sicuro di voler annullare la prenotazione?')) {
+        fetch(`/api/lezioni/${lessonId}/annulla`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'}
+        })
+        .then(r => r.json())
+        .then(data => {
+          if (data.ok) {
+            showToast('Annullata', 'Prenotazione annullata.');
+            setTimeout(() => loadLesson(), 1000);
+          } else {
+            alert(data.error || 'Errore');
+          }
+        });
+      }
+    }
+
+    function contactTeacher() {
+      alert('Funzione messaggi disponibile dalla sezione Messaggi');
+      window.location.href = '/messaggi';
+    }
+  </script>
+
+</body>
+</html>
