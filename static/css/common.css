@@ -1,0 +1,41 @@
+@media (max-width: 768px) {
+  .sidebar {
+    width: 70px;
+  }
+  .sidebar-logo span,
+  .sidebar-section-label,
+  .nav-item span {
+    display: none;
+  }
+  .nav-item svg {
+    margin: 0 auto;
+  }
+  .main {
+    margin-left: 70px;
+    padding: 20px;
+  }
+  .content-row,
+  .layout {
+    grid-template-columns: 1fr;
+  }
+  .lesson-card {
+    flex-direction: column;
+  }
+  .lesson-thumb-placeholder {
+    width: 100%;
+    height: auto;
+  }
+  .stats-row {
+    grid-template-columns: 1fr;
+  }
+  .conv-panel {
+    width: 100%;
+    margin-bottom: 20px;
+  }
+  .main-content {
+    flex-direction: column;
+  }
+  .chat-area {
+    width: 100%;
+  }
+}
