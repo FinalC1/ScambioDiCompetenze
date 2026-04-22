@@ -249,6 +249,13 @@
       border-color: rgba(34,197,86,0.3);
     }
     .toast.success .toast-title { color: var(--success-color); }
+    @media (max-width: 768px) {
+  .sidebar { width: 70px; }
+  .sidebar-logo span, .sidebar-section-label, .nav-item span { display: none; }
+  .nav-item svg { margin: 0 auto; }
+  .main { margin-left: 70px; padding: 20px; }
+  .content-row { grid-template-columns: 1fr; }
+}
   </style>
 </head>
 <body>

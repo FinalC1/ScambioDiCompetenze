@@ -205,6 +205,13 @@
       font-size: 0.93rem;
     }
     .empty svg { width: 40px; height: 40px; stroke: var(--text-muted); margin: 0 auto 14px; display: block; }
+    @media (max-width: 768px) {
+  .sidebar { width: 70px; }
+  .sidebar-logo span, .sidebar-section-label, .nav-item span { display: none; }
+  .nav-item svg { margin: 0 auto; }
+  .main { margin-left: 70px; padding: 20px; }
+  .content-row { grid-template-columns: 1fr; }
+}
   </style>
 </head>
 <body>

@@ -134,6 +134,13 @@
     .send-btn:hover  { background: #1a72f0; transform: translateY(-1px); }
     .send-btn:active { transform: translateY(0); }
     .send-btn svg    { width: 17px; height: 17px; stroke: #fff; fill: none; }
+    @media (max-width: 768px) {
+  .sidebar { width: 70px; }
+  .sidebar-logo span, .sidebar-section-label, .nav-item span { display: none; }
+  .nav-item svg { margin: 0 auto; }
+  .main { margin-left: 70px; padding: 20px; }
+  .content-row { grid-template-columns: 1fr; }
+}
   </style>
 </head>
 <body>
@@ -280,63 +287,34 @@
   }
 
   function renderChat(userId, userName) {
-    fetch(`/api/messaggi/chat/${userId}`)
-      .then(r => r.json())
-      .then(data => {
-        if (data.ok) {
-          myUserId = data.my_user_id;
-          
-          document.getElementById('chat-area').innerHTML = `
-            <div class="chat-hdr">
-              <div class="chat-hdr-l">
-                <div class="hdr-av">
-                  <svg viewBox="0 0 44 44">
-                    <circle cx="22" cy="22" r="22" fill="#0f2a3f"/>
-                    <text x="22" y="28" text-anchor="middle" font-size="18" font-weight="bold" fill="#fff">
-                      ${userName.charAt(0).toUpperCase()}
-                    </text>
-                  </svg>
-                </div>
-                <div>
-                  <div class="hdr-name">${userName}</div>
-                  <div class="hdr-offline">Online</div>
-                </div>
+  fetch(`/api/messaggi/chat/${userId}`)
+    .then(r => r.json())
+    .then(data => {
+      if (data.ok) {
+        myUserId = data.my_user_id;
+        document.getElementById('chat-area').innerHTML = `
+          <div class="chat-hdr">
+            <div class="chat-hdr-l">
+              <div class="hdr-av">...</div>
+              <div><div class="hdr-name">${escapeHtml(userName)}</div><div class="hdr-online">Online</div></div>
+            </div>
+            <button class="menu-btn">...</button>
+          </div>
+          <div class="msgs" id="chat-msgs">
+            ${data.messaggi.map(m => `
+              <div class="${m.id_mittente === data.my_user_id ? 'msg-out' : 'msg-in'} msg-item" data-id="${m.id_messaggio}">
+                <div class="bbl">${escapeHtml(m.contenuto)}</div>
+                <div class="ts">${m.ora || ''}</div>
               </div>
-              <button class="menu-btn">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                  <circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/>
-                </svg>
-              </button>
-            </div>
-            <div class="msgs" id="chat-msgs">
-              ${data.messaggi.map(m => `
-                <div class="${m.id_mittente === data.my_user_id ? 'msg-out' : 'msg-in'}">
-                  <div class="bbl">${escapeHtml(m.contenuto)}</div>
-                  <div class="ts">${m.ora || m.data_invio?.substring(11, 16) || ''}</div>
-                </div>
-              `).join('')}
-            </div>
-            <div class="chat-bar">
-              <div class="inp-wrap">
-                <input type="text" id="chat-input" placeholder="Scrivi un messaggio..."
-                  onkeydown="if(event.key==='Enter') window.sendMessage && window.sendMessage()"/>
-              </div>
-              <button class="send-btn" onclick="window.sendMessage && window.sendMessage()">
-                <svg viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5"/>
-                </svg>
-              </button>
-            </div>
-          `;
-          
-          const msgsDiv = document.getElementById('chat-msgs');
-          if (msgsDiv) msgsDiv.scrollTop = msgsDiv.scrollHeight;
-        } else {
-          console.error('Errore chat:', data.error);
-        }
-      })
-      .catch(err => console.error('Errore fetch chat:', err));
-  }
+            `).join('')}
+          </div>
+          <div class="chat-bar">...invio...</div>
+        `;
+        const msgsDiv = document.getElementById('chat-msgs');
+        if (msgsDiv) msgsDiv.scrollTop = msgsDiv.scrollHeight;
+      }
+    });
+}
 
   function openConv(userId, userName) {
     window.activeChatId = userId;

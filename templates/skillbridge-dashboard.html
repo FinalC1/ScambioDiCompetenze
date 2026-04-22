@@ -487,6 +487,13 @@
       transition: background 0.18s, transform 0.12s;
     }
     .btn-pubblica:hover { background: #1a72f0; transform: translateY(-1px); }
+    @media (max-width: 768px) {
+  .sidebar { width: 70px; }
+  .sidebar-logo span, .sidebar-section-label, .nav-item span { display: none; }
+  .nav-item svg { margin: 0 auto; }
+  .main { margin-left: 70px; padding: 20px; }
+  .content-row { grid-template-columns: 1fr; }
+}
   </style>
 </head>
 <body>
@@ -674,7 +681,14 @@
   const raw = localStorage.getItem('sb_username') || 'Utente';
   const firstName = raw.trim().split(/\s+/)[0];
     const display = firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase();
-  document.getElementById('welcome-title').textContent = 'Bentornato, ' + display + '!';
+  fetch('/api/me')
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) {
+      const nome = data.user.nome;
+      document.getElementById('welcome-title').textContent = `Bentornato, ${nome}!`;
+    }
+  });
   document.querySelector('.sidebar-logo .avatar').textContent = 'S'; // Logo fisso SkillBridge
 
   function loadDashboard() {

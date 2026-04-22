@@ -339,6 +339,10 @@ def api_register():
 @app.route('/api/logout', methods=['GET','POST'])
 def api_logout():
     session.clear(); return redirect('/login')
+    
+@app.route('/logout')
+def logout_redirect():
+    return redirect('/api/logout')
 
 
 @app.route('/api/me')
