@@ -1,7 +1,7 @@
 function doLogin() {
       var email = document.getElementById("input-username").value.trim();
       var password = document.querySelector('input[type="password"]').value;
-      
+
       if (!email || !password) { 
         alert("Inserisci email e password.");
         return; 
@@ -26,7 +26,7 @@ function doLogin() {
       });
     }
     
-    document.addEventListener("DOMContentLoaded", function(){
+   document.addEventListener("DOMContentLoaded", function(){
       document.getElementById("input-username").addEventListener("keydown", function(e){
         if (e.key === "Enter") doLogin();
       });
