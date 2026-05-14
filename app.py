@@ -393,30 +393,55 @@ def api_me():
 # ─────────────────────────────────────────────────────────────────────────────
 @app.route('/api/reset-password/richiedi', methods=['POST'])
 def api_reset_richiedi():
-    email=(request.get_json().get('email') or '').strip().lower()
-    if not email: return err('Email obbligatoria')
-    conn = get_db()
-    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-    cur.execute("SELECT id_utente,nome FROM utente WHERE LOWER(email)=%s",(email,))
-    user=cur.fetchone()
-    if not user:
-        cur.close(); put_db(conn)
-        return ok(message="Se l'email è registrata riceverai un codice.")
-    cur.execute("UPDATE reset_password SET usato=TRUE WHERE id_utente=%s AND usato=FALSE",(user['id_utente'],))
-    token  = secrets.token_urlsafe(32)
-    codice = str(secrets.randbelow(900000)+100000)
-    scad   = datetime.now()+timedelta(minutes=15)
-    cur.execute("INSERT INTO reset_password (id_utente,token,codice,scadenza) VALUES (%s,%s,%s,%s)",
-                (user['id_utente'],token,codice,scad))
-    conn.commit()
-    cur.close()
-    put_db(conn)
-    ok_invio = send_email(email,'SkillBridge — Codice verifica reset password',
-        f"Ciao {user['nome']},\n\nCodice di verifica: {codice}\nValido 15 minuti.\n\n"
-        f"Se non hai richiesto il reset, ignora questa mail.")
-    if not ok_invio:
-        return err("Errore nell'invio del codice. Riprova più tardi.", 500)
-    return ok(token=token, message='Codice inviato!')
+    try:
+        data = request.get_json()
+        if not data:
+            return err('Dati mancanti', 400)
+        email = (data.get('email') or '').strip().lower()
+        if not email:
+            return err('Email obbligatoria', 400)
+        print(f'[RESET] Richiesta per email: {email}')
+        
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute("SELECT id_utente, nome FROM utente WHERE LOWER(email)=%s", (email,))
+        user = cur.fetchone()
+        
+        if not user:
+            # non riveliamo che l'email non esiste per sicurezza, ma rispondiamo comunque ok
+            cur.close()
+            put_db(conn)
+            print(f'[RESET] Email non trovata: {email}')
+            return ok(message="Se l'email è registrata riceverai un codice.")
+        
+        # Invalida vecchi token
+        cur.execute("UPDATE reset_password SET usato=TRUE WHERE id_utente=%s AND usato=FALSE", (user['id_utente'],))
+        token = secrets.token_urlsafe(32)
+        codice = str(secrets.randbelow(900000) + 100000)
+        scad = datetime.now() + timedelta(minutes=15)
+        cur.execute("INSERT INTO reset_password (id_utente, token, codice, scadenza) VALUES (%s, %s, %s, %s)",
+                    (user['id_utente'], token, codice, scad))
+        conn.commit()
+        cur.close()
+        put_db(conn)
+        
+        # Invio email
+        ok_invio = send_email(email, 'SkillBridge — Codice verifica reset password',
+            f"Ciao {user['nome']},\n\nIl tuo codice di verifica è: {codice}\nValido 15 minuti.\n\n"
+            f"Se non hai richiesto il reset, ignora questa mail.")
+        
+        if not ok_invio:
+            print(f'[RESET] Invio email fallito per {email}')
+            return err("Errore nell'invio del codice. Riprova più tardi.", 500)
+        
+        print(f'[RESET] Codice inviato a {email}')
+        return ok(token=token, message='Codice inviato!')
+    
+    except Exception as e:
+        print(f'[RESET] ERRORE: {e}')
+        import traceback
+        traceback.print_exc()
+        return err('Errore interno del server', 500)
 
 @app.route('/api/reset-password/verifica', methods=['POST'])
 def api_reset_verifica():
