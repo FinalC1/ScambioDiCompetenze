@@ -1,18 +1,26 @@
-// socket_chat.js - versione finale
-const socket = io({
+// socket_chat.js - versione finale con error handling
+const socket = io(window.location.origin, {
   transports: ['websocket', 'polling'],
-  reconnection: true
+  reconnection: true,
+  reconnectionAttempts: 5,
+  reconnectionDelay: 1000
 });
 
 socket.on('connect', () => console.log('[WS] Connesso'));
+socket.on('connect_error', (err) => {
+  console.error('[WS] Errore connessione:', err);
+  if (window.showToast) {
+    window.showToast('Errore', 'Impossibile connettersi alla chat in tempo reale', 'error');
+  } else {
+    alert('Chat non disponibile al momento, riprova più tardi.');
+  }
+});
 socket.on('disconnect', () => console.log('[WS] Disconnesso'));
 
 socket.on('nuovo_messaggio', (msg) => {
-  // msg = { id_messaggio, id_mittente, contenuto, ora, out }
   const container = document.getElementById('chat-msgs');
   if (window.activeChatId && (msg.id_mittente === window.activeChatId || msg.out)) {
     if (container) {
-      // Evita duplicati
       if (document.querySelector(`.msg-item[data-id="${msg.id_messaggio}"]`)) return;
       const div = document.createElement('div');
       div.className = msg.out ? 'msg-out' : 'msg-in';
@@ -22,7 +30,6 @@ socket.on('nuovo_messaggio', (msg) => {
       container.scrollTop = container.scrollHeight;
     }
   }
-  // Aggiorna anteprima nella lista conversazioni
   if (window.updateConvPreview) {
     window.updateConvPreview(msg.id_mittente, msg.contenuto, msg.ora);
   }
@@ -33,7 +40,6 @@ window.sendMessage = function() {
   const inp = document.getElementById('chat-input');
   const text = inp?.value.trim();
   if (!text) return;
-  // Aggiunta ottimistica
   const container = document.getElementById('chat-msgs');
   const now = new Date();
   const ora = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
