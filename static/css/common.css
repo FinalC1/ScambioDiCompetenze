@@ -1,12 +1,12 @@
-/* ─── STILE NATIVO MOBILE / INSTAGRAM STYLE ─── */
+/* ─── INTERFACCIA RESPONSIVE MOBILE (INSTAGRAM STYLE) ─── */
 
 @media (max-width: 768px) {
     body {
         flex-direction: column-reverse !important;
-        /* Sidebar in basso su mobile */
+        /* Sposta la barra di navigazione fissa in basso */
         overflow-x: hidden;
     }
-    /* Barra di Navigazione Inferiore (Tipo Instagram) */
+    /* BARRA INFERIORE (Instagram Navigation Bar) */
     .sidebar {
         width: 100% !important;
         height: 65px !important;
@@ -24,7 +24,7 @@
         border-right: none !important;
         box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
     }
-    /* Nascondi elementi non necessari nella barra inferiore */
+    /* Nascondi loghi e scritte ingombranti per mantenere pulito lo schermo */
     .sidebar-logo,
     .sidebar-section-label,
     .sidebar-spacer,
@@ -50,8 +50,8 @@
         align-items: center;
     }
     .nav-item svg {
-        width: 24px !important;
-        height: 24px !important;
+        width: 26px !important;
+        height: 26px !important;
         margin: 0 auto !important;
     }
     .sidebar-logout {
@@ -64,26 +64,50 @@
     .sidebar-logout a {
         padding: 15px !important;
     }
-    /* Area Principale del Contenuto */
+    /* AREA DEL CONTENUTO */
     .main {
         margin-left: 0 !important;
         padding: 16px 16px 85px 16px !important;
-        /* Spazio in basso per non coprire il testo con la barra */
+        /* Spazio inferiore di sicurezza */
         width: 100% !important;
         box-sizing: border-box;
     }
-    /* Gestione Chat Responsiva (WhatsApp/Instagram Style) */
+    /* LAYOUT GRIGLIE DASHBOARD / CERCA */
+    .stats-row {
+        grid-template-columns: 1fr !important;
+        gap: 12px;
+    }
+    .content-row,
+    .layout {
+        grid-template-columns: 1fr !important;
+    }
+    .skills-grid {
+        grid-template-columns: 1fr !important;
+        gap: 14px;
+    }
+    .sug-card {
+        flex-direction: column !important;
+    }
+    .sug-thumb {
+        width: 100% !important;
+        height: 120px !important;
+    }
+    .info-card {
+        position: relative !important;
+        top: 0 !important;
+    }
+    /* GESTIONE CHAT RESPONSIVA (Instagram Direct Style) */
     .main-content {
         flex-direction: column !important;
-        height: calc(100vh - 100px) !important;
+        height: calc(100vh - 85px) !important;
         padding: 0 !important;
         gap: 0 !important;
     }
-    /* Se la chat non è aperta, nascondi l'area dei messaggi */
+    /* Se la chat è chiusa, mostra solo i contatti */
     .main-content:not(.chat-open) .chat-area {
         display: none !important;
     }
-    /* Se la chat è aperta, nascondi la lista dei contatti */
+    /* Se la chat è aperta, mostra solo la conversazione a tutto schermo */
     .main-content.chat-open .conv-panel {
         display: none !important;
     }
@@ -99,13 +123,19 @@
         border-radius: 0 !important;
         border: none !important;
     }
+    /* Barra di inserimento testo fissa sopra la navigazione inferiore */
     .chat-bar {
-        padding: 10px 12px 12px !important;
+        position: fixed;
+        bottom: 65px;
+        left: 0;
+        right: 0;
+        background: #0d1f30;
+        padding: 10px 14px 12px !important;
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+        z-index: 999;
     }
-    .stats-row {
-        grid-template-columns: 1fr !important;
-    }
-    .layout {
-        grid-template-columns: 1fr !important;
+    .msgs {
+        padding: 16px 16px 80px 16px !important;
+        /* Margine per non coprire l'ultimo messaggio con la barra di input */
     }
 }

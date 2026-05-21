@@ -3,7 +3,7 @@ from gevent import monkey
 monkey.patch_all()
 
 """
-SkillBridge - app.py (Versione Presentazione Finale Unificata e Corretta)
+SkillBridge - app.py (Versione Presentazione Finale Certificata)
 """
 
 import os
@@ -20,6 +20,8 @@ from flask_socketio import SocketIO, emit, join_room, leave_room
 import psycopg2
 import psycopg2.extras
 import smtplib as smtp
+from email.mime.text import MIMEText
+from email.header import Header
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 app.secret_key = "chiave_segreta_skillbridge_2024"
@@ -36,7 +38,7 @@ DB_URL = os.environ.get(
     'postgresql://postgres:PASSWORD@HOST:6543/postgres'
 )
 
-# Vecchie Credenziali Configurate
+# Vecchie Credenziali Configurate e Testate
 MAIL_MITTENTE = "skillbridge.einaudi@gmail.com"
 MAIL_PASSWORD  = "jwlu iret icve xuea"
 
@@ -82,21 +84,25 @@ def genera_codice():
     h = secrets.token_hex(4).upper()
     return f"SB-{h[:4]}-{h[4:]}"
 
-# Invio Email con Vecchio Script SMTP
+# CHIAVE DI RISOLUZIONE: SMTP Welcome Email con codifica UTF-8 sicura contro i crash
 def send_welcome_email_smtp(dest, nome):
     try:
-        server = smtp.SMTP("smtp.gmail.com", 587, timeout=10)
-        server.starttls()
-        server.login(MAIL_MITTENTE, MAIL_PASSWORD)
-        msg = (
-            f"Subject: Benvenuto in SkillBridge!\n\n"
+        msg = MIMEText(
             f"Ciao {nome},\n\n"
             f"Benvenuto in SkillBridge! Il tuo account e' stato creato con successo.\n"
             f"Puoi ora accedere, cercare lezioni, insegnare le tue competenze e molto altro.\n\n"
             f"Buon apprendimento!\n"
-            f"Il team di SkillBridge"
+            f"Il team di SkillBridge",
+            'plain', 'utf-8'
         )
-        server.sendmail(MAIL_MITTENTE, dest, msg.encode('utf-8'))
+        msg['Subject'] = Header("Benvenuto in SkillBridge!", 'utf-8')
+        msg['From'] = MAIL_MITTENTE
+        msg['To'] = dest
+
+        server = smtp.SMTP("smtp.gmail.com", 587, timeout=10)
+        server.starttls()
+        server.login(MAIL_MITTENTE, MAIL_PASSWORD)
+        server.sendmail(MAIL_MITTENTE, [dest], msg.as_string())
         server.quit()
         return True
     except Exception as e:
@@ -105,16 +111,20 @@ def send_welcome_email_smtp(dest, nome):
 
 def send_otp_email_smtp(dest, codice):
     try:
+        msg = MIMEText(
+            f"Il tuo codice di verifica OTP per reimpostare la password e': {codice}\n"
+            f"Il codice e' valido per 15 minuti.\n\n"
+            f"Se non hai richiesto tu il reset, ignora questa comunicazione.",
+            'plain', 'utf-8'
+        )
+        msg['Subject'] = Header("SkillBridge - Codice di Reset Password", 'utf-8')
+        msg['From'] = MAIL_MITTENTE
+        msg['To'] = dest
+
         server = smtp.SMTP("smtp.gmail.com", 587, timeout=10)
         server.starttls()
         server.login(MAIL_MITTENTE, MAIL_PASSWORD)
-        msg = (
-            f"Subject: SkillBridge - Codice di Reset Password\n\n"
-            f"Il tuo codice di verifica OTP per reimpostare la password e': {codice}\n"
-            f"Il codice e' valido per 15 minuti.\n\n"
-            f"Se non hai richiesto tu il reset, ignora questa comunicazione."
-        )
-        server.sendmail(MAIL_MITTENTE, dest, msg.encode('utf-8'))
+        server.sendmail(MAIL_MITTENTE, [dest], msg.as_string())
         server.quit()
         return True
     except Exception as e:
@@ -150,6 +160,16 @@ def page_guard(f):
 
 def ok(**kw):    return jsonify({'ok': True,  **kw})
 def err(m, c=400): return jsonify({'ok': False, 'error': m}), c
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SERVING FILE DI SFONDO SPLASH SCREEN DALLA ROOT
+# ─────────────────────────────────────────────────────────────────────────────
+@app.route('/bg_splash.jpg')
+@app.route('/static/bg_splash.jpg')
+def serve_bg_splash():
+    if os.path.exists('static/bg_splash.jpg'):
+        return send_from_directory('static', 'bg_splash.jpg')
+    return send_from_directory('.', 'bg_splash.jpg')
 
 # ─────────────────────────────────────────────────────────────────────────────
 # ROTTE WEB & PWA
@@ -308,7 +328,7 @@ def api_register():
             send_welcome_email_smtp(email, nome)
             return ok(message=f'Registrazione completata!')
 
-# ROTTA DI LOGOUT SICURA
+# ROTTA DI LOGOUT SICURA CON DISTRUZIONE CACHE
 @app.route('/logout', methods=['GET', 'POST'])
 @app.route('/api/logout', methods=['GET', 'POST'])
 def api_logout():
@@ -569,21 +589,21 @@ def api_mie_lezioni():
             cur.execute("""SELECT l.id_lezione,l.titolo,l.data_lezione::text,l.orario::text,
                                   l.modalita,l.luogo,l.numero_massimo_partecipanti,
                                   u.nome||' '||u.cognome AS nome_insegnante, c.nome_competenza AS categoria
-                           FROM prenotazione p JOIN lezione l ON p.id_lezione=l.id_lezione
-                           JOIN utente u ON l.id_insegnante=u.id_utente
-                           LEFT JOIN competenza c ON l.id_competenza=c.id_competenza
-                           WHERE p.id_utente=%s AND p.stato='Confermata' ORDER BY l.data_lezione DESC""", (uid,))
+                           FROM prenotazione p JOIN lezione l ON p.id_lezione = l.id_lezione
+                           JOIN utente u ON l.id_insegnante = u.id_utente
+                           LEFT JOIN competenza c ON l.id_competenza = c.id_competenza
+                           WHERE p.id_utente = %s AND p.stato = 'Confermata' ORDER BY l.data_lezione DESC""", (uid,))
             freq = [dict(r) for r in (cur.fetchall() or [])]
             cur.execute("""SELECT l.id_lezione,l.titolo,l.data_lezione::text,l.orario::text,
                                   l.modalita,l.luogo,l.numero_massimo_partecipanti,
                                   c.nome_competenza AS categoria
-                           FROM lezione l LEFT JOIN competenza c ON l.id_competenza=c.id_competenza
-                           WHERE l.id_insegnante=%s ORDER BY l.data_lezione DESC""", (uid,))
+                           FROM lezione l LEFT JOIN competenza c ON l.id_competenza = c.id_competenza
+                           WHERE l.id_insegnante = %s ORDER BY l.data_lezione DESC""", (uid,))
             ins = [dict(r) for r in (cur.fetchall() or [])]
             for l in ins:
                 cur.execute("""SELECT u.nome,u.cognome,u.username FROM prenotazione p
-                               JOIN utente u ON p.id_utente=u.id_utente
-                               WHERE p.id_lezione=%s AND p.stato='Confermata'""", (l['id_lezione'],))
+                               JOIN utente u ON p.id_utente = u.id_utente
+                               WHERE p.id_lezione = %s AND p.stato = 'Confermata'""", (l['id_lezione'],))
                 l['partecipanti'] = [dict(r) for r in (cur.fetchall() or [])]
             for r in freq + ins: r['passata'] = r['data_lezione'] < today
             return ok(frequentando=freq, insegnando=ins)
@@ -656,7 +676,7 @@ def api_aggiorna_profilo():
     if username: session['user_username'] = username
     return ok(message='Profilo aggiornato!')
 
-# CHIAVE DI RISOLUZIONE: MAPPATURA LIVELLO COMPETENZE E RIMOZIONE DI CHECK STRICT IN PYTHON
+# MAPPATURA LIVELLO COMPETENZE FAIL-SAFE
 @app.route('/api/competenze/aggiungi', methods=['POST'])
 @login_required
 def api_aggiungi_comp():
@@ -667,7 +687,7 @@ def api_aggiungi_comp():
     livello = d.get('livello', 'Intermedio')
     tipo = d.get('tipo', 'Offerta')
     
-    # Adattamento dei fusi per superare i Check Constraints di PostgreSQL
+    # Conversione fail-safe per superare i Check Constraints
     if livello == 'Principiante': livello = 'Base'
     if livello == 'Esperto': livello = 'Avanzato'
     
