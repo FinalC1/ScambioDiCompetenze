@@ -37,11 +37,8 @@ function handleSubmit(event) {
     const email = document.getElementById('email').value.trim().toLowerCase();
     const password = document.getElementById('password').value;
     const bio = document.getElementById('bio').value.trim();
+    const username = document.getElementById('username').value.trim(); // Risolto ReferenceError
 
-    // CHIAVE DI RISOLUZIONE: recupera correttamente l'elemento dal DOM per evitare l'errore d'esecuzione.
-    const username = document.getElementById('username').value.trim();
-
-    // Validazioni frontend
     if (!nome || !cognome) {
         showFieldError('nome', 'Nome e cognome obbligatori');
         return;
@@ -57,12 +54,10 @@ function handleSubmit(event) {
         return;
     }
 
-    // Animazione pulsante
     btnRegister.disabled = true;
     btnRegister.classList.add('loading');
     btnRegister.innerHTML = '<div class="loader"></div> Registrazione in corso...';
 
-    // API Chiamata
     fetch('/api/register', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
