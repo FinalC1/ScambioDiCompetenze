@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SkillBridge – Amministrazione</title>
+  <link rel="stylesheet" href="/static/css/common.css">
+  <link rel="stylesheet" href="/static/css/admin.css">
+</head>
+<body>
+
+<aside class="sidebar">
+  <h2 style="font-size: 1.2rem; font-weight:700; margin-bottom: 30px;">🛡️ SB Admin</h2>
+  <button class="tab-btn active" id="btn-utenti" onclick="switchTab('utenti', this)">Gestione Utenti</button>
+  <button class="tab-btn" id="btn-lezioni" onclick="switchTab('lezioni', this)">Gestione Corsi</button>
+  <button class="tab-btn" id="btn-competenze" onclick="switchTab('competenze', this)">Gestione Materie</button>
+  <div style="flex:1;"></div>
+  <a href="/api/logout" class="logout-link">Esci</a>
+</aside>
+
+<main class="main">
+  <h1 id="tab-title">Gestione Utenti</h1>
+  <p class="subtitle-admin">Pannello di controllo manutenzione e moderazione SkillBridge.</p>
+
+  <!-- SEZIONE UTENTI -->
+  <div id="section-utenti" class="table-container tab-section">
+    <h3>Utenti registrati</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Nome</th>
+          <th>Username</th>
+          <th>Email</th>
+          <th>Codice</th>
+          <th>Azioni</th>
+        </tr>
+      </thead>
+      <tbody id="utenti-tbody"></tbody>
+    </table>
+  </div>
+
+  <!-- SEZIONE CORSI -->
+  <div id="section-lezioni" class="table-container tab-section" style="display:none;">
+    <h3>Corsi programmati</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Titolo</th>
+          <th>Insegnante</th>
+          <th>Data</th>
+          <th>Ora</th>
+          <th>Azioni</th>
+        </tr>
+      </thead>
+      <tbody id="lezioni-tbody"></tbody>
+    </table>
+  </div>
+
+  <!-- SEZIONE COMPETENZE -->
+  <div id="section-competenze" class="table-container tab-section" style="display:none;">
+    <h3>Inserisci nuova materia nel Catalogo globale</h3>
+    <div class="form-add-comp">
+      <input type="text" id="comp-nome" class="input-field" placeholder="Nome Materia (es. Storia Dell'arte)"/>
+      <input type="text" id="comp-categoria" class="input-field" placeholder="Categoria (es. Arte, Informatica, Materie Base)"/>
+      <input type="text" id="comp-desc" class="input-field" placeholder="Breve descrizione (opzionale)"/>
+      <button class="btn-add" onclick="addCompetenza()">Aggiungi Materia</button>
+    </div>
+    
+    <h3>Materie disponibili</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Materia</th>
+          <th>Categoria</th>
+          <th>Azioni</th>
+        </tr>
+      </thead>
+      <tbody id="competenze-tbody"></tbody>
+    </table>
+  </div>
+</main>
+
+<script src="/static/js/admin.js"></script>
+</body>
+</html>

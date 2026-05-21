@@ -13,9 +13,6 @@ function loadConversations() {
         .then(data => {
             if (data.ok) {
                 renderConvList(data.conversazioni);
-                if (data.conversazioni.length > 0 && !window.activeChatId) {
-                    openConv(data.conversazioni[0].id_utente, data.conversazioni[0].nome);
-                }
             }
         })
         .catch(err => console.error('Errore:', err));
@@ -26,8 +23,11 @@ function renderConvList(conversations, filter = '') {
     const vis = conversations.filter(c =>
         c.nome.toLowerCase().includes(filter.toLowerCase())
     );
+    if (vis.length === 0) {
+        el.innerHTML = '<div style="padding:20px; text-align:center; color:rgba(255,255,255,0.2); font-size:0.85rem;">Nessuna conversazione attiva</div>';
+        return;
+    }
     el.innerHTML = vis.map(c => {
-        // CHIAVE DI RISOLUZIONE: il confronto ora avviene tramite ID mittente corretto
         const prev = c.ultimo_msg ? (c.ultimo_mittente_id === myUserId ? 'Tu: ' : '') + c.ultimo_msg : '';
         return `<div class="conv-item${c.id_utente === window.activeChatId ? ' active' : ''}" 
                   data-user-id="${c.id_utente}" 
@@ -51,6 +51,31 @@ function renderConvList(conversations, filter = '') {
       </div>
     </div>`;
     }).join('');
+}
+
+// CHIAVE DI RISOLUZIONE RICERCA UTENTI DA CHAT
+function startNewChatByCode() {
+    const inputEl = document.getElementById('search-code-input');
+    const query = inputEl.value.trim();
+    if (!query) {
+        alert("Inserisci un codice univoco o uno username.");
+        return;
+    }
+
+    fetch(`/api/utenti/cerca?q=${encodeURIComponent(query)}`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) {
+                openConv(data.utente.id, `${data.utente.nome} ${data.utente.cognome}`);
+                inputEl.value = '';
+            } else {
+                alert(data.error || "Utente non trovato.");
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert("Errore durante la ricerca.");
+        });
 }
 
 window.updateConvPreview = function(userId, testo, ora) {
@@ -120,7 +145,7 @@ function renderChat(userId, userName) {
         if (msgsDiv) msgsDiv.scrollTop = msgsDiv.scrollHeight;
       }
     })
-    .catch(err => console.error('Errore caricamento conversazione:', err));
+    .catch(err => console.error('Errore chat:', err));
 }
 
 function openConv(userId, userName) {

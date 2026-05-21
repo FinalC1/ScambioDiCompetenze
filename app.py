@@ -1,41 +1,30 @@
 # CHIAVE DI RISOLUZIONE WEBSOCKET SU RENDER:
-# Eseguire il monkey patching all'inizio assoluto del programma.
 from gevent import monkey
 monkey.patch_all()
 
 """
-SkillBridge - app.py
-Backend Flask con:
-  - Flask-SocketIO -> messaggi in tempo reale (Websocket)
-  - PostgreSQL     -> database cloud Supabase (pooler)
-  - Reset password -> 2FA via email con logging
+SkillBridge - app.py (Versione Finale con Pannello Admin, Sicurezza e Validazione Date)
 """
 
 import os
 import re
 import secrets
 import hashlib
-import time
-import smtplib as smtp
 from datetime import date, datetime, timedelta
 from functools import wraps
+from contextlib import contextmanager
 
 from flask import Flask, send_from_directory, request, redirect, session, jsonify
 from flask_socketio import SocketIO, emit, join_room, leave_room
 import psycopg2
 import psycopg2.extras
-from psycopg2 import pool, OperationalError
-
+import smtplib as smtp
 from email.mime.text import MIMEText
 from email.header import Header
 
-# ─────────────────────────────────────────────────────────────────────────────
-# CONFIGURAZIONE
-# ─────────────────────────────────────────────────────────────────────────────
 app = Flask(__name__, static_folder='static', template_folder='templates')
 app.secret_key = os.environ.get('SECRET_KEY', 'skillbridge_secret_2024')
 
-# WebSocket — usa gevent su Render
 socketio = SocketIO(app,
     cors_allowed_origins='*',
     async_mode='gevent',
@@ -43,45 +32,29 @@ socketio = SocketIO(app,
     engineio_logger=False
 )
 
-# ── Database PostgreSQL (Supabase) ──────────────────────────────────────────
 DB_URL = os.environ.get(
     'DB_URL',
     'postgresql://postgres:PASSWORD@HOST:6543/postgres'
 )
 
-# Configurazione del connection pooler per gestire connessioni concorrenti
-try:
-    db_pool = pool.SimpleConnectionPool(1, 10, dsn=DB_URL)
-    print("[DB] Connection pool inizializzato con successo.")
-except Exception as e:
-    print(f"[DB ERROR] Errore inizializzazione pool: {e}")
-    db_pool = None
-
-# ── Email ───────────────────────────────────────────────────────────────────
 MAIL_FROM = os.environ.get('MAIL_FROM', 'skillbridge.einaudi@gmail.com')
 MAIL_PASS = os.environ.get('MAIL_PASS', 'jwlu iret icve xuea')
 
-# ─────────────────────────────────────────────────────────────────────────────
-# PAROLACCE
-# ─────────────────────────────────────────────────────────────────────────────
+# Lista estesa per moderazione contenuti
 PAROLACCE = [
     'cazzo','minchia','vaffanculo','stronzo','stronza','merda','coglione',
     'bastardo','bastarda','puttana','fanculo','frocio','troia','cagna',
-    'negro','negra','cornuto','fuck','shit','bitch','asshole','bastard','dick'
+    'negro','negra','cornuto','fuck','shit','bitch','asshole','bastard',
+    'inappropriato','porno','allusioni_volgari','puttane'
 ]
 
-# ─────────────────────────────────────────────────────────────────────────────
-# HELPERS
-# ─────────────────────────────────────────────────────────────────────────────
-def get_db():
-    if db_pool:
-        return db_pool.getconn()
-    return psycopg2.connect(DB_URL)
-
-def release_db(conn):
-    if db_pool:
-        db_pool.putconn(conn)
-    else:
+# GESTORE DI CONTESTO PER EVITARE SATURAZIONE DELLE CONNESSIONI
+@contextmanager
+def db_conn():
+    conn = psycopg2.connect(DB_URL)
+    try:
+        yield conn
+    finally:
         conn.close()
 
 def hash_pw(pw):
@@ -92,6 +65,14 @@ def is_valid_email(e):
 
 def is_valid_username(u):
     return re.match(r'^[a-zA-Z0-9_.]{3,30}$', u)
+
+def contiene_inappropriato(testo):
+    if not testo: return False
+    testo_lower = testo.lower()
+    for p in PAROLACCE:
+        if p in testo_lower:
+            return True
+    return False
 
 def censura(t):
     if not t: return t
@@ -115,10 +96,13 @@ def send_email(dest, subject, body):
         s.login(MAIL_FROM, MAIL_PASS)
         s.sendmail(MAIL_FROM, [dest], msg.as_string())
         s.quit()
-        print(f"[MAIL] Email inviata con successo a {dest}")
+        print(f"[MAIL] Email inviata a {dest}")
+        return True
     except Exception as e:
         print(f'[MAIL ERROR] {e}')
+        return False
 
+# Decoratori Sicurezza
 def login_required(f):
     @wraps(f)
     def d(*a, **kw):
@@ -127,11 +111,21 @@ def login_required(f):
         return f(*a, **kw)
     return d
 
+def admin_required(f):
+    @wraps(f)
+    def d(*a, **kw):
+        if 'user_id' not in session or session.get('user_username') != 'adminsskill':
+            return jsonify({'ok': False, 'error': 'Accesso negato'}), 403
+        return f(*a, **kw)
+    return d
+
 def page_guard(f):
     @wraps(f)
     def d(*a, **kw):
         if 'user_id' not in session:
             return redirect('/login')
+        if session.get('user_username') == 'adminsskill':
+            return redirect('/admin')
         return f(*a, **kw)
     return d
 
@@ -139,11 +133,26 @@ def ok(**kw):    return jsonify({'ok': True,  **kw})
 def err(m, c=400): return jsonify({'ok': False, 'error': m}), c
 
 # ─────────────────────────────────────────────────────────────────────────────
-# PWA — manifest e service worker
+# SEED ADMIN UTENTE
+# ─────────────────────────────────────────────────────────────────────────────
+def seed_admin():
+    with db_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id_utente FROM utente WHERE username='adminsskill'")
+            if not cur.fetchone():
+                cur.execute(
+                    "INSERT INTO utente (nome, cognome, email, password, username, codice_univoco, data_registrazione, descrizione_profilo) "
+                    "VALUES ('Admin', 'SkillBridge', 'admin@skillbridge.it', %s, 'adminsskill', 'SB-ADMIN-SB99', %s, 'Amministratore di Sistema')",
+                    (hash_pw('AdminBridge4!'), date.today())
+                )
+                conn.commit()
+                print("[INIT] Account Amministratore creato con successo.")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ROTTE WEB & PWA
 # ─────────────────────────────────────────────────────────────────────────────
 @app.route('/manifest.json')
-def manifest():
-    return send_from_directory('static', 'manifest.json')
+def manifest(): return send_from_directory('static', 'manifest.json')
 
 @app.route('/sw.js')
 def service_worker():
@@ -153,18 +162,16 @@ def service_worker():
     return resp
 
 @app.route('/favicon.ico')
-def favicon():
-    return send_from_directory('static', 'favicon.ico')
+def favicon(): return send_from_directory('static', 'favicon.ico')
 
-# ─────────────────────────────────────────────────────────────────────────────
-# PAGINE HTML
-# ─────────────────────────────────────────────────────────────────────────────
 @app.route('/')
 def home():
-    return redirect('/dashboard' if 'user_id' in session else '/login')
+    if 'user_id' in session:
+        return redirect('/admin' if session.get('user_username') == 'adminsskill' else '/dashboard')
+    return redirect('/login')
 
 @app.route('/login')
-def login_page():    return send_from_directory('templates','skillbridge-login.html')
+def login_page(): return send_from_directory('templates','skillbridge-login.html')
 
 @app.route('/register')
 def register_page(): return send_from_directory('templates','skillbridge-register.html')
@@ -196,8 +203,14 @@ def messaggi_page():  return send_from_directory('templates','skillbridge-messag
 @page_guard
 def profilo_page():   return send_from_directory('templates','skillbridge-profilo.html')
 
+@app.route('/admin')
+def admin_page():
+    if 'user_id' not in session or session.get('user_username') != 'adminsskill':
+        return redirect('/login')
+    return send_from_directory('templates','skillbridge-admin.html')
+
 # ─────────────────────────────────────────────────────────────────────────────
-# API: AUTH
+# API: AUTHENTICATION
 # ─────────────────────────────────────────────────────────────────────────────
 @app.route('/api/login', methods=['POST'])
 def api_login():
@@ -205,37 +218,28 @@ def api_login():
     lid = (d.get('email') or '').strip().lower()
     pw  = d.get('password','')
     if not lid or not pw: return err('Email/username e password obbligatori')
-    conn = None
-    try:
-        conn = get_db()
-        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        cur.execute(
-            "SELECT * FROM utente WHERE (LOWER(email)=%s OR LOWER(username)=%s) AND password=%s",
-            (lid, lid, hash_pw(pw))
-        )
-        user = cur.fetchone()
-        cur.close()
-        if not user:
-            return err('Credenziali errate', 401)
-        
-        session.update({
-            'user_id': user['id_utente'],
-            'user_name': user['nome'],
-            'user_cognome': user['cognome'],
-            'user_username': user.get('username', '')
-        })
-        return ok(user={
-            'id': user['id_utente'],
-            'nome': user['nome'],
-            'cognome': user['cognome'],
-            'username': user.get('username', '')
-        })
-    except Exception as e:
-        print(f'[LOGIN ERROR] {e}')
-        return err('Errore durante l\'accesso')
-    finally:
-        if conn:
-            release_db(conn)
+    
+    with db_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                "SELECT * FROM utente WHERE (LOWER(email)=%s OR LOWER(username)=%s) AND password=%s",
+                (lid, lid, hash_pw(pw))
+            )
+            user = cur.fetchone()
+            if not user: return err('Credenziali errate', 401)
+            
+            session.update({
+                'user_id': user['id_utente'],
+                'user_name': user['nome'],
+                'user_cognome': user['cognome'],
+                'user_username': user.get('username','')
+            })
+            return ok(user={
+                'id': user['id_utente'],
+                'nome': user['nome'],
+                'cognome': user['cognome'],
+                'username': user.get('username','')
+            })
 
 @app.route('/api/register', methods=['POST'])
 def api_register():
@@ -244,117 +248,89 @@ def api_register():
     cognome = (d.get('cognome') or '').strip()
     email   = (d.get('email')   or '').strip().lower()
     pw      = d.get('password','')
-    bio     = censura((d.get('bio') or '').strip())
+    bio     = (d.get('bio') or '').strip()
     username= (d.get('username') or '').strip().lower()
+
+    if contiene_inappropriato(nome) or contiene_inappropriato(cognome) or contiene_inappropriato(bio) or contiene_inappropriato(username):
+        return err('Il testo inserito contiene parole non consentite!')
 
     if not nome or not cognome: return err('Nome e cognome obbligatori')
     if not is_valid_email(email): return err('Email non valida')
     if len(pw) < 6: return err('Password minimo 6 caratteri')
     
-    conn = None
-    try:
-        conn = get_db()
-        cur = conn.cursor()
-        if username:
-            if not is_valid_username(username):
-                cur.close()
-                return err('Username non valido (3-30 caratteri: lettere, numeri, _, .)')
-            cur.execute("SELECT id_utente FROM utente WHERE username=%s", (username,))
-            if cur.fetchone():
-                cur.close()
-                return err('Username già in uso')
-        else:
-            base = re.sub(r'[^a-z0-9_.]', '', (cognome + '.' + nome).lower())[:25] or 'user'
-            username, i = base, 0
-            while True:
+    with db_conn() as conn:
+        with conn.cursor() as cur:
+            if username:
+                if not is_valid_username(username):
+                    return err('Username non valido (3-30 caratteri)')
                 cur.execute("SELECT id_utente FROM utente WHERE username=%s", (username,))
-                if not cur.fetchone(): break
-                i += 1; username = f'{base}{i}'
-                
-        codice = genera_codice()
-        while True:
-            cur.execute("SELECT id_utente FROM utente WHERE codice_univoco=%s", (codice,))
-            if not cur.fetchone(): break
-            codice = genera_codice()
+                if cur.fetchone(): return err('Username già in uso')
+            else:
+                base = re.sub(r'[^a-z0-9_.]', '', (cognome + '.' + nome).lower())[:25] or 'user'
+                username, i = base, 0
+                while True:
+                    cur.execute("SELECT id_utente FROM utente WHERE username=%s", (username,))
+                    if not cur.fetchone(): break
+                    i += 1; username = f'{base}{i}'
             
-        cur.execute(
-            "INSERT INTO utente (nome,cognome,email,password,descrizione_profilo,"
-            "username,codice_univoco,data_registrazione) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
-            (nome, cognome, email, hash_pw(pw), bio, username, codice, date.today())
-        )
-        conn.commit()
-        cur.close()
-        
-        send_email(email, 'Benvenuto in SkillBridge!',
-            f'Ciao {nome},\n\nBenvenuto in SkillBridge!\n'
-            f'Username: @{username}\nCodice univoco: {codice}\n\n'
-            f'Il codice serve per farti trovare dagli altri studenti nella chat.\n\nIl team di SkillBridge')
-        return ok(message='Registrazione completata!')
-    except Exception as e:
-        if conn: conn.rollback()
-        print(f'[REGISTRATION ERROR] {e}')
-        return err('Email o username già registrati')
-    finally:
-        if conn:
-            release_db(conn)
+            codice = genera_codice()
+            while True:
+                cur.execute("SELECT id_utente FROM utente WHERE codice_univoco=%s", (codice,))
+                if not cur.fetchone(): break
+                codice = genera_codice()
+                
+            cur.execute(
+                "INSERT INTO utente (nome,cognome,email,password,descrizione_profilo,username,codice_univoco,data_registrazione) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
+                (nome, cognome, email, hash_pw(pw), censura(bio), username, codice, date.today())
+            )
+            conn.commit()
+            
+            mail_sent = send_email(email, 'Benvenuto in SkillBridge!', 
+                f'Ciao {nome},\n\nBenvenuto in SkillBridge!\nCodice univoco: {codice}\n\nIl team di SkillBridge')
+            if not mail_sent:
+                print("[WARNING] Registrazione completata ma email non spedita.")
+            return ok(message='Registrazione completata!')
 
 @app.route('/api/logout', methods=['GET','POST'])
 def api_logout():
     session.clear()
     return redirect('/login')
 
-@app.route('/logout')
-def logout_redirect():
-    return redirect('/api/logout')
-
 @app.route('/api/me')
 def api_me():
     if 'user_id' not in session: return err('Non autenticato', 401)
-    return ok(user={
-        'id': session['user_id'],
-        'nome': session['user_name'],
-        'cognome': session.get('user_cognome', ''),
-        'username': session.get('user_username', '')
-    })
+    return ok(user={'id': session['user_id'], 'nome': session['user_name'],
+                    'cognome': session.get('user_cognome',''), 'username': session.get('user_username','')})
 
 # ─────────────────────────────────────────────────────────────────────────────
-# API: RESET PASSWORD (2FA mail)
+# API: RESET PASSWORD (OTP)
 # ─────────────────────────────────────────────────────────────────────────────
 @app.route('/api/reset-password/richiedi', methods=['POST'])
 def api_reset_richiedi():
-    data = request.get_json() or {}
-    email = (data.get('email') or '').strip().lower()
+    email = (request.get_json() or {}).get('email', '').strip().lower()
     if not email: return err('Email obbligatoria')
-    conn = None
-    try:
-        conn = get_db()
-        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        cur.execute("SELECT id_utente,nome FROM utente WHERE LOWER(email)=%s", (email,))
-        user = cur.fetchone()
-        if not user:
-            cur.close()
-            return ok(message="Se l'email è registrata riceverai un codice.")
-        
-        cur.execute("UPDATE reset_password SET usato=TRUE WHERE id_utente=%s AND usato=FALSE", (user['id_utente'],))
-        token = secrets.token_urlsafe(32)
-        codice = str(secrets.randbelow(900000) + 100000)
-        scad = datetime.now() + timedelta(minutes=15)
-        cur.execute("INSERT INTO reset_password (id_utente,token,codice,scadenza) VALUES (%s,%s,%s,%s)",
-                    (user['id_utente'], token, codice, scad))
-        conn.commit()
-        cur.close()
-        
-        send_email(email, 'SkillBridge — Codice verifica reset password',
-            f"Ciao {user['nome']},\n\nCodice di verifica: {codice}\nValido 15 minuti.\n\n"
-            f"Se non hai richiesto il reset, ignora questa mail.")
-        return ok(token=token, message='Codice inviato!')
-    except Exception as e:
-        if conn: conn.rollback()
-        print(f'[RESET REQ ERROR] {e}')
-        return err('Errore durante la richiesta di reset')
-    finally:
-        if conn:
-            release_db(conn)
+    
+    with db_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT id_utente,nome FROM utente WHERE LOWER(email)=%s", (email,))
+            user = cur.fetchone()
+            if not user:
+                return err("L'email inserita non è associata ad alcun utente.")
+            
+            cur.execute("UPDATE reset_password SET usato=TRUE WHERE id_utente=%s AND usato=FALSE", (user['id_utente'],))
+            token = secrets.token_urlsafe(32)
+            codice = str(secrets.randbelow(900000) + 100000)
+            scad = datetime.now() + timedelta(minutes=15)
+            cur.execute("INSERT INTO reset_password (id_utente,token,codice,scadenza) VALUES (%s,%s,%s,%s)",
+                        (user['id_utente'], token, codice, scad))
+            conn.commit()
+            
+            # Impedisce l'avanzamento se l'invio fallisce effettivamente
+            if send_email(email, 'SkillBridge — Codice Reset Password', f'Codice di verifica: {codice}'):
+                return ok(token=token, message='Codice inviato!')
+            else:
+                return err("Errore nell'invio dell'email. Riprova tra pochi istanti.")
 
 @app.route('/api/reset-password/verifica', methods=['POST'])
 def api_reset_verifica():
@@ -362,22 +338,14 @@ def api_reset_verifica():
     token = (d.get('token') or '').strip()
     codice = (d.get('codice') or '').strip()
     if not token or not codice: return err('Dati mancanti')
-    conn = None
-    try:
-        conn = get_db()
-        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        cur.execute("SELECT * FROM reset_password WHERE token=%s AND usato=FALSE AND scadenza>NOW()", (token,))
-        row_ = cur.fetchone()
-        cur.close()
-        if not row_: return err('Token scaduto o non valido', 400)
-        if row_['codice'] != codice: return err('Codice errato', 400)
-        return ok(message='Codice corretto.')
-    except Exception as e:
-        print(f'[RESET VERIFY ERROR] {e}')
-        return err('Errore durante la verifica')
-    finally:
-        if conn:
-            release_db(conn)
+    
+    with db_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT * FROM reset_password WHERE token=%s AND usato=FALSE AND scadenza>NOW()", (token,))
+            row_ = cur.fetchone()
+            if not row_: return err('Token scaduto o non valido')
+            if row_['codice'] != codice: return err('Codice errato')
+            return ok(message='Codice corretto.')
 
 @app.route('/api/reset-password/nuova', methods=['POST'])
 def api_reset_nuova():
@@ -387,27 +355,16 @@ def api_reset_nuova():
     pw = d.get('password', '')
     if not token or not codice or not pw: return err('Dati mancanti')
     if len(pw) < 6: return err('Password minimo 6 caratteri')
-    conn = None
-    try:
-        conn = get_db()
-        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        cur.execute("SELECT * FROM reset_password WHERE token=%s AND usato=FALSE AND scadenza>NOW()", (token,))
-        row_ = cur.fetchone()
-        if not row_ or row_['codice'] != codice:
-            cur.close()
-            return err('Token o codice non valido', 400)
-        cur.execute("UPDATE utente SET password=%s WHERE id_utente=%s", (hash_pw(pw), row_['id_utente']))
-        cur.execute("UPDATE reset_password SET usato=TRUE WHERE token=%s", (token,))
-        conn.commit()
-        cur.close()
-        return ok(message='Password aggiornata!')
-    except Exception as e:
-        if conn: conn.rollback()
-        print(f'[RESET UPDATE ERROR] {e}')
-        return err('Errore aggiornamento password')
-    finally:
-        if conn:
-            release_db(conn)
+    
+    with db_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT * FROM reset_password WHERE token=%s AND usato=FALSE AND scadenza>NOW()", (token,))
+            row_ = cur.fetchone()
+            if not row_ or row_['codice'] != codice: return err('Token o codice non valido')
+            cur.execute("UPDATE utente SET password=%s WHERE id_utente=%s", (hash_pw(pw), row_['id_utente']))
+            cur.execute("UPDATE reset_password SET usato=TRUE WHERE token=%s", (token,))
+            conn.commit()
+            return ok(message='Password aggiornata!')
 
 # ─────────────────────────────────────────────────────────────────────────────
 # API: DASHBOARD
@@ -416,45 +373,36 @@ def api_reset_nuova():
 @login_required
 def api_dashboard():
     uid = session['user_id']
-    conn = None
-    try:
-        conn = get_db()
-        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        cur.execute("SELECT COUNT(*) AS n FROM prenotazione WHERE id_utente=%s AND stato='Confermata'", (uid,))
-        freq = cur.fetchone()['n'] or 0
-        cur.execute("""SELECT COALESCE(ROUND(AVG(f.voto::numeric),1),0) AS m FROM feedback f
-                       JOIN lezione l ON f.id_lezione=l.id_lezione WHERE l.id_insegnante=%s""", (uid,))
-        media = float(cur.fetchone()['m'] or 0)
-        cur.execute("SELECT COUNT(*) AS n FROM lezione WHERE id_insegnante=%s", (uid,))
-        ins_n = cur.fetchone()['n'] or 0
-        
-        cur.execute("""SELECT l.id_lezione,l.titolo,l.descrizione,l.data_lezione::text,
-                              l.orario::text,l.durata,l.modalita,l.luogo,l.numero_massimo_partecipanti,
-                              u.nome||' '||u.cognome AS nome_insegnante, c.nome_competenza AS categoria
-                       FROM lezione l JOIN utente u ON l.id_insegnante=u.id_utente
-                       LEFT JOIN competenza c ON l.id_competenza=c.id_competenza
-                       WHERE l.id_insegnante!=%s AND l.data_lezione>=CURRENT_DATE
-                         AND l.id_lezione NOT IN (
-                             SELECT id_lezione FROM prenotazione WHERE id_utente=%s AND stato!='Annullata')
-                       ORDER BY l.data_lezione ASC LIMIT 3""", (uid, uid))
-        cons = [dict(r) for r in (cur.fetchall() or [])]
-        
-        cur.execute("""SELECT c.nome_competenza,uc.livello,uc.tipo FROM utente_competenza uc
-                       JOIN competenza c ON uc.id_competenza=c.id_competenza
-                       WHERE uc.id_utente=%s ORDER BY c.nome_competenza""", (uid,))
-        comps = [dict(r) for r in (cur.fetchall() or [])]
-        
-        cur.execute("SELECT id_competenza,nome_competenza FROM competenza ORDER BY nome_competenza")
-        cl = [dict(r) for r in (cur.fetchall() or [])]
-        cur.close()
-        return ok(stats={'lezioni_frequentate': freq, 'punti': ins_n*50 + freq*10, 'media_feedback': media},
-                  lezioni_consigliate=cons, competenze=comps, competenze_list=cl)
-    except Exception as e:
-        print(f'[DASHBOARD ERROR] {e}')
-        return err('Errore caricamento dashboard')
-    finally:
-        if conn:
-            release_db(conn)
+    with db_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT COUNT(*) AS n FROM prenotazione WHERE id_utente=%s AND stato='Confermata'", (uid,))
+            freq = cur.fetchone()['n'] or 0
+            cur.execute("""SELECT COALESCE(ROUND(AVG(f.voto::numeric),1),0) AS m FROM feedback f
+                           JOIN lezione l ON f.id_lezione=l.id_lezione WHERE l.id_insegnante=%s""", (uid,))
+            media = float(cur.fetchone()['m'] or 0)
+            cur.execute("SELECT COUNT(*) AS n FROM lezione WHERE id_insegnante=%s", (uid,))
+            ins_n = cur.fetchone()['n'] or 0
+            
+            cur.execute("""SELECT l.id_lezione,l.titolo,l.descrizione,l.data_lezione::text,
+                                  l.orario::text,l.durata,l.modalita,l.luogo,l.numero_massimo_partecipanti,
+                                  u.nome||' '||u.cognome AS nome_insegnante, c.nome_competenza AS categoria
+                           FROM lezione l JOIN utente u ON l.id_insegnante=u.id_utente
+                           LEFT JOIN competenza c ON l.id_competenza=c.id_competenza
+                           WHERE l.id_insegnante!=%s AND l.data_lezione>=CURRENT_DATE
+                             AND l.id_lezione NOT IN (
+                                 SELECT id_lezione FROM prenotazione WHERE id_utente=%s AND stato!='Annullata')
+                           ORDER BY l.data_lezione ASC LIMIT 3""", (uid, uid))
+            cons = [dict(r) for r in (cur.fetchall() or [])]
+            
+            cur.execute("""SELECT c.nome_competenza,uc.livello,uc.tipo FROM utente_competenza uc
+                           JOIN competenza c ON uc.id_competenza=c.id_competenza
+                           WHERE uc.id_utente=%s ORDER BY c.nome_competenza""", (uid,))
+            comps = [dict(r) for r in (cur.fetchall() or [])]
+            
+            cur.execute("SELECT id_competenza,nome_competenza FROM competenza ORDER BY nome_competenza")
+            cl = [dict(r) for r in (cur.fetchall() or [])]
+            return ok(stats={'lezioni_frequentate': freq, 'punti': ins_n*50 + freq*10, 'media_feedback': media},
+                      lezioni_consigliate=cons, competenze=comps, competenze_list=cl)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # API: LEZIONI
@@ -463,160 +411,129 @@ def api_dashboard():
 def api_lezioni():
     cat = request.args.get('categoria', '').strip()
     q = request.args.get('q', '').strip()
-    conn = None
-    try:
-        conn = get_db()
-        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        sql = """SELECT l.id_lezione,l.titolo,l.descrizione,l.data_lezione::text,l.orario::text,
-                      l.durata,l.modalita,l.luogo,l.numero_massimo_partecipanti,l.id_insegnante,
-                      u.nome||' '||u.cognome AS nome_insegnante,
-                      c.nome_competenza AS categoria,c.id_competenza
-               FROM lezione l JOIN utente u ON l.id_insegnante=u.id_utente
-               LEFT JOIN competenza c ON l.id_competenza=c.id_competenza
-               WHERE l.data_lezione>=CURRENT_DATE"""
-        p = []
-        if cat: sql += " AND c.nome_competenza=%s"; p.append(cat)
-        if q:   sql += " AND (l.titolo ILIKE %s OR l.descrizione ILIKE %s OR c.nome_competenza ILIKE %s)"; p += [f'%{q}%'] * 3
-        sql += " ORDER BY c.nome_competenza ASC, l.data_lezione ASC LIMIT 100"
-        cur.execute(sql, p)
-        r = [dict(x) for x in (cur.fetchall() or [])]
-        cur.close()
-        return ok(lezioni=r)
-    except Exception as e:
-        print(f'[LEZIONI LIST ERROR] {e}')
-        return err('Errore caricamento lezioni')
-    finally:
-        if conn:
-            release_db(conn)
+    with db_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            sql = """SELECT l.id_lezione,l.titolo,l.descrizione,l.data_lezione::text,l.orario::text,
+                          l.durata,l.modalita,l.luogo,l.numero_massimo_partecipanti,l.id_insegnante,
+                          u.nome||' '||u.cognome AS nome_insegnante,
+                          c.nome_competenza AS categoria,c.id_competenza
+                   FROM lezione l JOIN utente u ON l.id_insegnante=u.id_utente
+                   LEFT JOIN competenza c ON l.id_competenza=c.id_competenza
+                   WHERE l.data_lezione>=CURRENT_DATE"""
+            p = []
+            if cat: sql += " AND c.nome_competenza=%s"; p.append(cat)
+            if q:   sql += " AND (l.titolo ILIKE %s OR l.descrizione ILIKE %s OR c.nome_competenza ILIKE %s)"; p += [f'%{q}%'] * 3
+            sql += " ORDER BY c.nome_competenza ASC, l.data_lezione ASC LIMIT 100"
+            cur.execute(sql, p)
+            r = [dict(x) for x in (cur.fetchall() or [])]
+            return ok(lezioni=r)
 
 @app.route('/api/lezioni/crea', methods=['POST'])
 @login_required
 def api_crea_lezione():
     d = request.get_json() or {}
     uid = session['user_id']
-    if not d.get('titolo') or not d.get('data_lezione') or not d.get('orario'):
+    titolo = d.get('titolo', '').strip()
+    descrizione = d.get('descrizione', '').strip()
+    luogo = d.get('luogo', '').strip()
+    
+    if contiene_inappropriato(titolo) or contiene_inappropriato(descrizione) or contiene_inappropriato(luogo):
+        return err('Il testo inserito contiene termini non consentiti.')
+
+    if not titolo or not d.get('data_lezione') or not d.get('orario'):
         return err('Titolo, data e orario obbligatori')
-    if not d.get('id_competenza'): return err('Seleziona una competenza')
-    conn = None
+    
+    # VALIDAZIONE DATA DELLA LEZIONE (Minimo domani, Massimo 1 Anno da oggi)
     try:
-        conn = get_db()
-        cur = conn.cursor()
-        cur.execute("""INSERT INTO lezione (titolo,descrizione,id_competenza,id_insegnante,
-                       data_lezione,orario,modalita,luogo,numero_massimo_partecipanti,durata)
-                       VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id_lezione""",
-            (d['titolo'], d.get('descrizione', ''), d['id_competenza'], uid,
-             d['data_lezione'], d['orario'], d.get('modalita', 'Online'),
-             d.get('luogo', ''), int(d.get('numero_massimo_partecipanti') or 10),
-             int(d.get('durata') or 60)))
-        new_id = cur.fetchone()[0]
-        conn.commit()
-        cur.close()
-        return ok(message='Lezione creata!', id_lezione=new_id)
-    except Exception as e:
-        if conn: conn.rollback()
-        print(f'[CREATE LESSON ERROR] {e}')
-        return err('Errore creazione lezione')
-    finally:
-        if conn:
-            release_db(conn)
+        data_lez = datetime.strptime(d['data_lezione'], '%Y-%m-%d').date()
+        oggi = date.today()
+        domani = oggi + timedelta(days=1)
+        limite_anno = oggi + timedelta(days=365)
+        if data_lez < domani:
+            return err('La data della lezione deve essere almeno a partire da domani!')
+        if data_lez > limite_anno:
+            return err('Non puoi programmare lezioni oltre un anno da oggi!')
+    except ValueError:
+        return err('Formato data non valido')
+
+    if not d.get('id_competenza'): return err('Seleziona una competenza')
+    
+    with db_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""INSERT INTO lezione (titolo,descrizione,id_competenza,id_insegnante,
+                           data_lezione,orario,modalita,luogo,numero_massimo_partecipanti,durata)
+                           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id_lezione""",
+                (titolo, censura(descrizione), d['id_competenza'], uid,
+                 d['data_lezione'], d['orario'], d.get('modalita','Online'),
+                 censura(luogo), int(d.get('numero_massimo_partecipanti') or 10),
+                 int(d.get('durata') or 60)))
+            new_id = cur.fetchone()[0]
+            conn.commit()
+            return ok(message='Lezione creata!', id_lezione=new_id)
 
 @app.route('/api/lezioni/<int:id>')
 def api_lezione_detail(id):
     uid = session.get('user_id')
-    conn = None
-    try:
-        conn = get_db()
-        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        cur.execute("""SELECT l.*,l.data_lezione::text,l.orario::text,
-                              u.nome||' '||u.cognome AS nome_insegnante, u.id_utente AS id_ins,
-                              c.nome_competenza AS categoria
-                       FROM lezione l JOIN utente u ON l.id_insegnante=u.id_utente
-                       LEFT JOIN competenza c ON l.id_competenza=c.id_competenza
-                       WHERE l.id_lezione=%s""", (id,))
-        l = cur.fetchone()
-        if not l:
-            cur.close()
-            return err('Lezione non trovata', 404)
-        l = dict(l)
-        cur.execute("""SELECT u.id_utente,u.nome,u.cognome FROM prenotazione p
-                       JOIN utente u ON p.id_utente=u.id_utente
-                       WHERE p.id_lezione=%s AND p.stato='Confermata'""", (id,))
-        part = [dict(r) for r in (cur.fetchall() or [])]
-        
-        cur.execute("SELECT id_materiale, id_lezione, tipo, titolo AS nome_materiale, url_risorsa, data_caricamento::text FROM materiale WHERE id_lezione=%s", (id,))
-        mat = [dict(r) for r in (cur.fetchall() or [])]
-        
-        cur.execute("""SELECT f.voto,f.commento,f.data_feedback::text,u.nome,u.cognome
-                       FROM feedback f JOIN utente u ON f.id_utente=u.id_utente
-                       WHERE f.id_lezione=%s ORDER BY f.data_feedback DESC""", (id,))
-        fb = [dict(r) for r in (cur.fetchall() or [])]
-        cur.close()
-        l['id_insegnante'] = l['id_ins']
-        posti = max(0, (l['numero_massimo_partecipanti'] or 99) - len(part))
-        return ok(lezione=l, partecipanti=part, materiali=mat, feedback=fb,
-                  posti_disponibili=posti,
-                  is_teacher=(uid == l['id_ins']),
-                  is_booked=bool(uid and any(p['id_utente'] == uid for p in part)))
-    except Exception as e:
-        print(f'[LESSON DETAIL ERROR] {e}')
-        return err('Errore caricamento dettagli lezione')
-    finally:
-        if conn:
-            release_db(conn)
+    with db_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""SELECT l.*,l.data_lezione::text,l.orario::text,
+                                  u.nome||' '||u.cognome AS nome_insegnante, u.id_utente AS id_ins, u.codice_univoco AS codice_docente,
+                                  c.nome_competenza AS categoria
+                           FROM lezione l JOIN utente u ON l.id_insegnante=u.id_utente
+                           LEFT JOIN competenza c ON l.id_competenza=c.id_competenza
+                           WHERE l.id_lezione=%s""", (id,))
+            l = cur.fetchone()
+            if not l: return err('Lezione non trovata', 404)
+            l = dict(l)
+            
+            # PRIVACY ALUNNI: Seleziona SOLO l'username (nasconde nome reale e codice chat privato)
+            cur.execute("""SELECT u.id_utente, u.username FROM prenotazione p
+                           JOIN utente u ON p.id_utente=u.id_utente
+                           WHERE p.id_lezione=%s AND p.stato='Confermata'""", (id,))
+            part = [dict(r) for r in (cur.fetchall() or [])]
+            
+            cur.execute("SELECT id_materiale, id_lezione, tipo, titolo AS nome_materiale, url_risorsa, data_caricamento::text FROM materiale WHERE id_lezione=%s", (id,))
+            mat = [dict(r) for r in (cur.fetchall() or [])]
+            
+            cur.execute("""SELECT f.voto,f.commento,f.data_feedback::text,u.nome,u.cognome
+                           FROM feedback f JOIN utente u ON f.id_utente=u.id_utente
+                           WHERE f.id_lezione=%s ORDER BY f.data_feedback DESC""", (id,))
+            fb = [dict(r) for r in (cur.fetchall() or [])]
+            
+            posti = max(0, (l['numero_massimo_partecipanti'] or 99) - len(part))
+            return ok(lezione=l, partecipanti=part, materiali=mat, feedback=fb,
+                      posti_disponibili=posti,
+                      is_teacher=(uid == l['id_ins']),
+                      is_booked=bool(uid and any(p['id_utente'] == uid for p in part)))
 
 @app.route('/api/lezioni/<int:id>/prenota', methods=['POST'])
 @login_required
 def api_prenota(id):
     uid = session['user_id']
-    conn = None
-    try:
-        conn = get_db()
-        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        cur.execute("SELECT id_prenotazione FROM prenotazione WHERE id_lezione=%s AND id_utente=%s AND stato!='Annullata'", (id, uid))
-        if cur.fetchone():
-            cur.close()
-            return err('Già prenotato')
-        cur.execute("SELECT numero_massimo_partecipanti FROM lezione WHERE id_lezione=%s", (id,))
-        lez = cur.fetchone()
-        if not lez:
-            cur.close()
-            return err('Lezione non trovata', 404)
-        cur.execute("SELECT COUNT(*) AS n FROM prenotazione WHERE id_lezione=%s AND stato='Confermata'", (id,))
-        if cur.fetchone()['n'] >= (lez['numero_massimo_partecipanti'] or 99):
-            cur.close()
-            return err('Posti esauriti')
-        cur.execute("INSERT INTO prenotazione (data_prenotazione,stato,id_utente,id_lezione) VALUES (%s,'Confermata',%s,%s)",
-                    (date.today(), uid, id))
-        conn.commit()
-        cur.close()
-        return ok(message='Prenotazione confermata!')
-    except Exception as e:
-        if conn: conn.rollback()
-        print(f'[BOOK ERROR] {e}')
-        return err('Errore prenotazione')
-    finally:
-        if conn:
-            release_db(conn)
+    with db_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT id_prenotazione FROM prenotazione WHERE id_lezione=%s AND id_utente=%s AND stato!='Annullata'", (id, uid))
+            if cur.fetchone(): return err('Già prenotato')
+            cur.execute("SELECT numero_massimo_partecipanti FROM lezione WHERE id_lezione=%s", (id,))
+            lez = cur.fetchone()
+            if not lez: return err('Lezione non trovata', 404)
+            cur.execute("SELECT COUNT(*) AS n FROM prenotazione WHERE id_lezione=%s AND stato='Confermata'", (id,))
+            if cur.fetchone()['n'] >= (lez['numero_massimo_partecipanti'] or 99):
+                return err('Posti esauriti')
+            cur.execute("INSERT INTO prenotazione (data_prenotazione,stato,id_utente,id_lezione) VALUES (%s,'Confermata',%s,%s)",
+                        (date.today(), uid, id))
+            conn.commit()
+            return ok(message='Prenotazione confermata!')
 
 @app.route('/api/lezioni/<int:id>/annulla', methods=['POST'])
 @login_required
 def api_annulla(id):
     uid = session['user_id']
-    conn = None
-    try:
-        conn = get_db()
-        cur = conn.cursor()
-        cur.execute("UPDATE prenotazione SET stato='Annullata' WHERE id_lezione=%s AND id_utente=%s", (id, uid))
-        conn.commit()
-        cur.close()
-        return ok(message='Prenotazione annullata.')
-    except Exception as e:
-        if conn: conn.rollback()
-        print(f'[CANCEL BOOKING ERROR] {e}')
-        return err('Errore annullamento prenotazione')
-    finally:
-        if conn:
-            release_db(conn)
+    with db_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE prenotazione SET stato='Annullata' WHERE id_lezione=%s AND id_utente=%s", (id, uid))
+            conn.commit()
+            return ok(message='Prenotazione annullata.')
 
 # ─────────────────────────────────────────────────────────────────────────────
 # API: MIE LEZIONI
@@ -626,135 +543,64 @@ def api_annulla(id):
 def api_mie_lezioni():
     uid = session['user_id']
     today = str(date.today())
-    conn = None
-    try:
-        conn = get_db()
-        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        cur.execute("""SELECT l.id_lezione,l.titolo,l.data_lezione::text,l.orario::text,
-                              l.modalita,l.luogo,l.numero_massimo_partecipanti,
-                              u.nome||' '||u.cognome AS nome_insegnante, c.nome_competenza AS categoria
-                       FROM prenotazione p JOIN lezione l ON p.id_lezione=l.id_lezione
-                       JOIN utente u ON l.id_insegnante=u.id_utente
-                       LEFT JOIN competenza c ON l.id_competenza=c.id_competenza
-                       WHERE p.id_utente=%s AND p.stato='Confermata' ORDER BY l.data_lezione DESC""", (uid,))
-        freq = [dict(r) for r in (cur.fetchall() or [])]
-        cur.execute("""SELECT l.id_lezione,l.titolo,l.data_lezione::text,l.orario::text,
-                              l.modalita,l.luogo,l.numero_massimo_partecipanti,
-                              c.nome_competenza AS categoria
-                       FROM lezione l LEFT JOIN competenza c ON l.id_competenza=c.id_competenza
-                       WHERE l.id_insegnante=%s ORDER BY l.data_lezione DESC""", (uid,))
-        ins = [dict(r) for r in (cur.fetchall() or [])]
-        for l in ins:
-            cur.execute("""SELECT u.nome,u.cognome,u.username FROM prenotazione p
-                           JOIN utente u ON p.id_utente=u.id_utente
-                           WHERE p.id_lezione=%s AND p.stato='Confermata'""", (l['id_lezione'],))
-            l['partecipanti'] = [dict(r) for r in (cur.fetchall() or [])]
-        cur.close()
-        for r in freq + ins: r['passata'] = r['data_lezione'] < today
-        return ok(frequentando=freq, insegnando=ins)
-    except Exception as e:
-        print(f'[MIE LEZIONI ERROR] {e}')
-        return err('Errore caricamento mie lezioni')
-    finally:
-        if conn:
-            release_db(conn)
+    with db_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""SELECT l.id_lezione,l.titolo,l.data_lezione::text,l.orario::text,
+                                  l.modalita,l.luogo,l.numero_massimo_partecipanti,
+                                  u.nome||' '||u.cognome AS nome_insegnante, c.nome_competenza AS categoria
+                           FROM prenotazione p JOIN lezione l ON p.id_lezione=l.id_lezione
+                           JOIN utente u ON l.id_insegnante=u.id_utente
+                           LEFT JOIN competenza c ON l.id_competenza=c.id_competenza
+                           WHERE p.id_utente=%s AND p.stato='Confermata' ORDER BY l.data_lezione DESC""", (uid,))
+            freq = [dict(r) for r in (cur.fetchall() or [])]
+            cur.execute("""SELECT l.id_lezione,l.titolo,l.data_lezione::text,l.orario::text,
+                                  l.modalita,l.luogo,l.numero_massimo_partecipanti,
+                                  c.nome_competenza AS categoria
+                           FROM lezione l LEFT JOIN competenza c ON l.id_competenza=c.id_competenza
+                           WHERE l.id_insegnante=%s ORDER BY l.data_lezione DESC""", (uid,))
+            ins = [dict(r) for r in (cur.fetchall() or [])]
+            for l in ins:
+                cur.execute("""SELECT u.nome,u.cognome,u.username FROM prenotazione p
+                               JOIN utente u ON p.id_utente=u.id_utente
+                               WHERE p.id_lezione=%s AND p.stato='Confermata'""", (l['id_lezione'],))
+                l['partecipanti'] = [dict(r) for r in (cur.fetchall() or [])]
+            for r in freq + ins: r['passata'] = r['data_lezione'] < today
+            return ok(frequentando=freq, insegnando=ins)
 
 # ─────────────────────────────────────────────────────────────────────────────
-# API: COMPETENZE
-# ─────────────────────────────────────────────────────────────────────────────
-@app.route('/api/competenze')
-def api_competenze():
-    q = request.args.get('q', '').strip()
-    conn = None
-    try:
-        conn = get_db()
-        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        if q:
-            cur.execute("SELECT * FROM competenza WHERE nome_competenza ILIKE %s OR categoria ILIKE %s ORDER BY nome_competenza",
-                        (f'%{q}%', f'%{q}%'))
-        else:
-            cur.execute("SELECT * FROM competenza ORDER BY nome_competenza")
-        comps = [dict(r) for r in (cur.fetchall() or [])]
-        cats = sorted({c['categoria'] for c in comps if c.get('categoria')})
-        cur.close()
-        return ok(competenze=comps, categorie=cats)
-    except Exception as e:
-        print(f'[COMPETENZE LIST ERROR] {e}')
-        return err('Errore caricamento competenze')
-    finally:
-        if conn:
-            release_db(conn)
-
-@app.route('/api/competenze/aggiungi', methods=['POST'])
-@login_required
-def api_aggiungi_comp():
-    d = request.get_json() or {}
-    uid = session['user_id']
-    if not d.get('id_competenza'): return err('Seleziona una competenza')
-    conn = None
-    try:
-        conn = get_db()
-        cur = conn.cursor()
-        cur.execute("INSERT INTO utente_competenza (id_utente,id_competenza,livello,tipo) VALUES (%s,%s,%s,%s)",
-                    (uid, d['id_competenza'], d.get('livello', 'Intermedio'), d.get('tipo', 'Offerta')))
-        conn.commit()
-        cur.close()
-    except psycopg2.errors.UniqueViolation:
-        if conn: conn.rollback()
-    except Exception as e:
-        if conn: conn.rollback()
-        print(f'[ADD COMP ERROR] {e}')
-        return err('Errore aggiunta competenza')
-    finally:
-        if conn:
-            release_db(conn)
-    return ok(message='Competenza aggiunta!')
-
-# ─────────────────────────────────────────────────────────────────────────────
-# API: PROFILO
+# API: PROFILO & COMPETENZE UTENTE
 # ─────────────────────────────────────────────────────────────────────────────
 @app.route('/api/profilo')
 @login_required
 def api_profilo():
     uid = session['user_id']
-    conn = None
-    try:
-        conn = get_db()
-        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        cur.execute("SELECT id_utente,nome,cognome,email,descrizione_profilo,data_registrazione::text,username,codice_univoco FROM utente WHERE id_utente=%s", (uid,))
-        user = dict(cur.fetchone() or {})
-        if not user:
-            cur.close()
-            return err('Utente non trovato', 404)
-        cur.execute("SELECT COUNT(*) AS n FROM lezione WHERE id_insegnante=%s", (uid,))
-        ld = cur.fetchone()['n'] or 0
-        cur.execute("SELECT COUNT(*) AS n FROM utente_competenza WHERE id_utente=%s", (uid,))
-        nc = cur.fetchone()['n'] or 0
-        cur.execute("""SELECT COALESCE(ROUND(AVG(f.voto::numeric),1),0) AS m FROM feedback f
-                       JOIN lezione l ON f.id_lezione=l.id_lezione WHERE l.id_insegnante=%s""", (uid,))
-        media = float(cur.fetchone()['m'] or 0)
-        cur.execute("""SELECT l.id_lezione,l.titolo,l.data_lezione::text,l.orario::text,l.modalita,c.nome_competenza AS categoria
-                       FROM lezione l LEFT JOIN competenza c ON l.id_competenza=c.id_competenza
-                       WHERE l.id_insegnante=%s ORDER BY l.data_lezione DESC""", (uid,))
-        lc = [dict(r) for r in (cur.fetchall() or [])]
-        cur.execute("""SELECT c.nome_competenza,uc.livello,uc.tipo FROM utente_competenza uc
-                       JOIN competenza c ON uc.id_competenza=c.id_competenza WHERE uc.id_utente=%s ORDER BY c.nome_competenza""", (uid,))
-        comps = [dict(r) for r in (cur.fetchall() or [])]
-        cur.execute("""SELECT f.voto,f.commento,f.data_feedback::text,u.nome,u.cognome FROM feedback f
-                       JOIN lezione l ON f.id_lezione=l.id_lezione JOIN utente u ON f.id_utente=u.id_utente
-                       WHERE l.id_insegnante=%s ORDER BY f.data_feedback DESC""", (uid,))
-        fb = [dict(r) for r in (cur.fetchall() or [])]
-        cur.execute("SELECT id_competenza,nome_competenza FROM competenza ORDER BY nome_competenza")
-        cl = [dict(r) for r in (cur.fetchall() or [])]
-        cur.close()
-        return ok(user=user, stats={'lezioni_date': ld, 'competenze': nc, 'media_feedback': media},
-                  lezioni_create=lc, competenze=comps, feedback=fb, competenze_list=cl)
-    except Exception as e:
-        print(f'[PROFILO ERROR] {e}')
-        return err('Errore caricamento profilo')
-    finally:
-        if conn:
-            release_db(conn)
+    with db_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT id_utente,nome,cognome,email,descrizione_profilo,data_registrazione::text,username,codice_univoco FROM utente WHERE id_utente=%s", (uid,))
+            user = dict(cur.fetchone() or {})
+            if not user: return err('Utente non trovato', 404)
+            cur.execute("SELECT COUNT(*) AS n FROM lezione WHERE id_insegnante=%s", (uid,))
+            ld = cur.fetchone()['n'] or 0
+            cur.execute("SELECT COUNT(*) AS n FROM utente_competenza WHERE id_utente=%s", (uid,))
+            nc = cur.fetchone()['n'] or 0
+            cur.execute("""SELECT COALESCE(ROUND(AVG(f.voto::numeric),1),0) AS m FROM feedback f
+                           JOIN lezione l ON f.id_lezione=l.id_lezione WHERE l.id_insegnante=%s""", (uid,))
+            media = float(cur.fetchone()['m'] or 0)
+            cur.execute("""SELECT l.id_lezione,l.titolo,l.data_lezione::text,l.orario::text,l.modalita,c.nome_competenza AS categoria
+                           FROM lezione l LEFT JOIN competenza c ON l.id_competenza=c.id_competenza
+                           WHERE l.id_insegnante=%s ORDER BY l.data_lezione DESC""", (uid,))
+            lc = [dict(r) for r in (cur.fetchall() or [])]
+            cur.execute("""SELECT c.nome_competenza,uc.livello,uc.tipo FROM utente_competenza uc
+                           JOIN competenza c ON uc.id_competenza=c.id_competenza WHERE uc.id_utente=%s ORDER BY c.nome_competenza""", (uid,))
+            comps = [dict(r) for r in (cur.fetchall() or [])]
+            cur.execute("""SELECT f.voto,f.commento,f.data_feedback::text,u.nome,u.cognome FROM feedback f
+                           JOIN lezione l ON f.id_lezione=l.id_lezione JOIN utente u ON f.id_utente=u.id_utente
+                           WHERE l.id_insegnante=%s ORDER BY f.data_feedback DESC""", (uid,))
+            fb = [dict(r) for r in (cur.fetchall() or [])]
+            cur.execute("SELECT id_competenza,nome_competenza FROM competenza ORDER BY nome_competenza")
+            cl = [dict(r) for r in (cur.fetchall() or [])]
+            return ok(user=user, stats={'lezioni_date': ld, 'competenze': nc, 'media_feedback': media},
+                      lezioni_create=lc, competenze=comps, feedback=fb, competenze_list=cl)
 
 @app.route('/api/profilo/aggiorna', methods=['POST'])
 @login_required
@@ -763,38 +609,34 @@ def api_aggiorna_profilo():
     uid = session['user_id']
     nome = (d.get('nome') or '').strip()
     cognome = (d.get('cognome') or '').strip()
-    bio = censura((d.get('descrizione_profilo') or '').strip())
+    bio = (d.get('descrizione_profilo') or '').strip()
     username = (d.get('username') or '').strip().lower()
+
+    if contiene_inappropriato(nome) or contiene_inappropriato(cognome) or contiene_inappropriato(bio) or contiene_inappropriato(username):
+        return err('Il testo inserito contiene espressioni non consentite!')
+
     if username and not is_valid_username(username): return err('Username non valido')
-    conn = None
-    try:
-        conn = get_db()
-        cur = conn.cursor()
-        if username:
-            cur.execute("UPDATE utente SET nome=%s,cognome=%s,descrizione_profilo=%s,username=%s WHERE id_utente=%s",
-                        (nome, cognome, bio, username, uid))
-        else:
-            cur.execute("UPDATE utente SET nome=%s,cognome=%s,descrizione_profilo=%s WHERE id_utente=%s",
-                        (nome, cognome, bio, uid))
-        conn.commit()
-        cur.close()
-    except psycopg2.errors.UniqueViolation:
-        if conn: conn.rollback()
-        return err('Username già in uso')
-    except Exception as e:
-        if conn: conn.rollback()
-        print(f'[PROFILO UPDATE ERROR] {e}')
-        return err('Errore aggiornamento profilo')
-    finally:
-        if conn:
-            release_db(conn)
+    
+    with db_conn() as conn:
+        with conn.cursor() as cur:
+            try:
+                if username:
+                    cur.execute("UPDATE utente SET nome=%s,cognome=%s,descrizione_profilo=%s,username=%s WHERE id_utente=%s",
+                                (nome, cognome, censura(bio), username, uid))
+                else:
+                    cur.execute("UPDATE utente SET nome=%s,cognome=%s,descrizione_profilo=%s WHERE id_utente=%s",
+                                (nome, cognome, censura(bio), uid))
+                conn.commit()
+            except psycopg2.errors.UniqueViolation:
+                conn.rollback()
+                return err('Username già in uso')
     session['user_name'] = nome
     session['user_cognome'] = cognome
     if username: session['user_username'] = username
     return ok(message='Profilo aggiornato!')
 
 # ─────────────────────────────────────────────────────────────────────────────
-# API: MESSAGGI
+# API: MESSAGGI (RICERCA CON CODICE UNIVOCO ATTIVA)
 # ─────────────────────────────────────────────────────────────────────────────
 @app.route('/api/utenti/cerca')
 @login_required
@@ -802,97 +644,137 @@ def api_cerca_utente():
     q = (request.args.get('q') or '').strip()
     uid = session['user_id']
     if not q: return err('Inserisci codice o username')
-    conn = None
-    try:
-        conn = get_db()
-        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        cur.execute("""SELECT id_utente,nome,cognome,username,codice_univoco,descrizione_profilo
-                       FROM utente WHERE id_utente!=%s
-                       AND (UPPER(codice_univoco)=%s OR LOWER(username)=%s) LIMIT 1""",
-                    (uid, q.upper(), q.lower().lstrip('@')))
-        u = cur.fetchone()
-        cur.close()
-        if not u: return err('Nessun utente trovato', 404)
-        return ok(utente={'id': u['id_utente'], 'nome': u['nome'], 'cognome': u['cognome'],
-                          'username': u.get('username', ''), 'descrizione': u.get('descrizione_profilo', '')})
-    except Exception as e:
-        print(f'[UTENTI SEARCH ERROR] {e}')
-        return err('Errore ricerca utente')
-    finally:
-        if conn:
-            release_db(conn)
+    
+    with db_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""SELECT id_utente,nome,cognome,username,codice_univoco,descrizione_profilo
+                           FROM utente WHERE id_utente!=%s
+                           AND (UPPER(codice_univoco)=%s OR LOWER(username)=%s) LIMIT 1""",
+                        (uid, q.upper(), q.lower().lstrip('@')))
+            u = cur.fetchone()
+            if not u: return err('Nessun utente trovato con questo codice o username', 404)
+            return ok(utente={'id': u['id_utente'], 'nome': u['nome'], 'cognome': u['cognome'],
+                              'username': u.get('username',''), 'descrizione': u.get('descrizione_profilo','')})
 
 @app.route('/api/messaggi/conversazioni')
 @login_required
 def api_conversazioni():
     uid = session['user_id']
     q = (request.args.get('q') or '').strip()
-    conn = None
-    try:
-        conn = get_db()
-        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        sql = """SELECT u.id_utente,u.nome,u.cognome,u.username,
-                      (SELECT m.contenuto FROM messaggio m
-                       WHERE (m.id_mittente=u.id_utente AND m.id_destinatario=%s)
-                          OR (m.id_mittente=%s AND m.id_destinatario=u.id_utente)
-                       ORDER BY m.data_invio DESC LIMIT 1) AS ultimo_msg,
-                      (SELECT m.id_mittente FROM messaggio m
-                       WHERE (m.id_mittente=u.id_utente AND m.id_destinatario=%s)
-                          OR (m.id_mittente=%s AND m.id_destinatario=u.id_utente)
-                       ORDER BY m.data_invio DESC LIMIT 1) AS ultimo_mittente_id,
-                      (SELECT TO_CHAR(m.data_invio,'HH24:MI') FROM messaggio m
-                       WHERE (m.id_mittente=u.id_utente AND m.id_destinatario=%s)
-                          OR (m.id_mittente=%s AND m.id_destinatario=u.id_utente)
-                       ORDER BY m.data_invio DESC LIMIT 1) AS ora
-               FROM utente u WHERE u.id_utente!=%s
-               AND u.id_utente IN (
-                   SELECT id_mittente FROM messaggio WHERE id_destinatario=%s
-                   UNION SELECT id_destinatario FROM messaggio WHERE id_mittente=%s)"""
-        p = [uid, uid, uid, uid, uid, uid, uid, uid, uid]
-        if q: sql += " AND (u.nome ILIKE %s OR u.cognome ILIKE %s OR u.username ILIKE %s)"; p += [f'%{q}%'] * 3
-        sql += " ORDER BY ora DESC NULLS LAST"
-        cur.execute(sql, p)
-        r = [dict(x) for x in (cur.fetchall() or [])]
-        cur.close()
-        return ok(conversazioni=r)
-    except Exception as e:
-        print(f'[CONVERSATIONS ERROR] {e}')
-        return err('Errore conversazioni')
-    finally:
-        if conn:
-            release_db(conn)
+    with db_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            sql = """SELECT u.id_utente,u.nome,u.cognome,u.username,
+                          (SELECT m.contenuto FROM messaggio m
+                           WHERE (m.id_mittente=u.id_utente AND m.id_destinatario=%s)
+                              OR (m.id_mittente=%s AND m.id_destinatario=u.id_utente)
+                           ORDER BY m.data_invio DESC LIMIT 1) AS ultimo_msg,
+                          (SELECT m.id_mittente FROM messaggio m
+                           WHERE (m.id_mittente=u.id_utente AND m.id_destinatario=%s)
+                              OR (m.id_mittente=%s AND m.id_destinatario=u.id_utente)
+                           ORDER BY m.data_invio DESC LIMIT 1) AS ultimo_mittente_id,
+                          (SELECT TO_CHAR(m.data_invio,'HH24:MI') FROM messaggio m
+                           WHERE (m.id_mittente=u.id_utente AND m.id_destinatario=%s)
+                              OR (m.id_mittente=%s AND m.id_destinatario=u.id_utente)
+                           ORDER BY m.data_invio DESC LIMIT 1) AS ora
+                   FROM utente u WHERE u.id_utente!=%s
+                   AND u.id_utente IN (
+                       SELECT id_mittente FROM messaggio WHERE id_destinatario=%s
+                       UNION SELECT id_destinatario FROM messaggio WHERE id_mittente=%s)"""
+            p = [uid, uid, uid, uid, uid, uid, uid, uid, uid]
+            if q: sql += " AND (u.nome ILIKE %s OR u.cognome ILIKE %s OR u.username ILIKE %s)"; p += [f'%{q}%'] * 3
+            sql += " ORDER BY ora DESC NULLS LAST"
+            cur.execute(sql, p)
+            r = [dict(x) for x in (cur.fetchall() or [])]
+            return ok(conversazioni=r)
 
 @app.route('/api/messaggi/chat/<int:other_id>')
 @login_required
 def api_chat(other_id):
     uid = session['user_id']
-    conn = None
-    try:
-        conn = get_db()
-        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        cur.execute("""SELECT id_messaggio,id_mittente,contenuto,
-                              TO_CHAR(data_invio,'HH24:MI') AS ora
-                       FROM messaggio
-                       WHERE (id_mittente=%s AND id_destinatario=%s)
-                          OR (id_mittente=%s AND id_destinatario=%s)
-                       ORDER BY data_invio ASC LIMIT 100""", (uid, other_id, other_id, uid))
-        msgs = [dict(r) for r in (cur.fetchall() or [])]
-        for m in msgs: m['out'] = (m['id_mittente'] == uid)
-        cur.execute("SELECT id_utente,nome,cognome,username FROM utente WHERE id_utente=%s", (other_id,))
-        other = cur.fetchone()
-        cur.close()
-        if not other: return err('Utente non trovato', 404)
-        last_id = msgs[-1]['id_messaggio'] if msgs else 0
-        return ok(messaggi=msgs, interlocutore=dict(other), last_id=last_id, my_user_id=uid)
-    except Exception as e:
-        print(f'[CHAT LOAD ERROR] {e}')
-        return err('Errore storico chat')
-    finally:
-        if conn:
-            release_db(conn)
+    with db_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""SELECT id_messaggio,id_mittente,contenuto,
+                                  TO_CHAR(data_invio,'HH24:MI') AS ora
+                           FROM messaggio
+                           WHERE (id_mittente=%s AND id_destinatario=%s)
+                              OR (id_mittente=%s AND id_destinatario=%s)
+                           ORDER BY data_invio ASC LIMIT 100""", (uid, other_id, other_id, uid))
+            msgs = [dict(r) for r in (cur.fetchall() or [])]
+            for m in msgs: m['out'] = (m['id_mittente'] == uid)
+            cur.execute("SELECT id_utente,nome,cognome,username FROM utente WHERE id_utente=%s", (other_id,))
+            other = cur.fetchone()
+            if not other: return err('Utente non trovato', 404)
+            last_id = msgs[-1]['id_messaggio'] if msgs else 0
+            return ok(messaggi=msgs, interlocutore=dict(other), last_id=last_id, my_user_id=uid)
 
 # ─────────────────────────────────────────────────────────────────────────────
-# WEBSOCKET CHAT LOGIC (Gevent)
+# GESTIONE ADMIN: ENDPOINTS CRUD (PROTETTI DA RUOLO)
+# ─────────────────────────────────────────────────────────────────────────────
+@app.route('/api/admin/utenti', methods=['GET'])
+@admin_required
+def api_admin_get_utenti():
+    with db_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT id_utente, nome, cognome, email, username, codice_univoco FROM utente WHERE username != 'adminsskill' ORDER BY id_utente DESC")
+            return ok(utenti=cur.fetchall() or [])
+
+@app.route('/api/admin/utenti/<int:uid>', methods=['DELETE'])
+@admin_required
+def api_admin_delete_utente(uid):
+    with db_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM utente WHERE id_utente=%s AND username != 'adminsskill'", (uid,))
+            conn.commit()
+            return ok(message="Utente rimosso dal sistema.")
+
+@app.route('/api/admin/lezioni', methods=['GET'])
+@admin_required
+def api_admin_get_lezioni():
+    with db_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""SELECT l.id_lezione, l.titolo, l.descrizione, l.data_lezione::text, l.orario::text, 
+                                  u.nome || ' ' || u.cognome AS nome_insegnante 
+                           FROM lezione l JOIN utente u ON l.id_insegnante = u.id_utente ORDER BY l.id_lezione DESC""")
+            return ok(lezioni=cur.fetchall() or [])
+
+@app.route('/api/admin/lezioni/<int:lid>', methods=['DELETE'])
+@admin_required
+def api_admin_delete_lezione(lid):
+    with db_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM lezione WHERE id_lezione=%s", (lid,))
+            conn.commit()
+            return ok(message="Corso rimosso dal sistema.")
+
+@app.route('/api/admin/competenze', methods=['GET', 'POST'])
+@admin_required
+def api_admin_competenze():
+    with db_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            if request.method == 'GET':
+                cur.execute("SELECT * FROM competenza ORDER BY id_competenza DESC")
+                return ok(competenze=cur.fetchall() or [])
+            else:
+                d = request.get_json() or {}
+                nome = d.get('nome_competenza','').strip()
+                cat = d.get('categoria','').strip()
+                desc = d.get('descrizione','').strip()
+                if not nome or not cat: return err('Materia e categoria obbligatorie')
+                cur.execute("INSERT INTO competenza (nome_competenza, categoria, descrizione) VALUES (%s,%s,%s)", (nome, cat, desc))
+                conn.commit()
+                return ok(message="Materia aggiunta al catalogo globale.")
+
+@app.route('/api/admin/competenze/<int:cid>', methods=['DELETE'])
+@admin_required
+def api_admin_delete_competenza(cid):
+    with db_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM competenza WHERE id_competenza=%s", (cid,))
+            conn.commit()
+            return ok(message="Materia rimossa con successo dal catalogo.")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# WEBSOCKET
 # ─────────────────────────────────────────────────────────────────────────────
 @socketio.on('connect')
 def on_connect():
@@ -900,14 +782,14 @@ def on_connect():
         return False
     uid = session['user_id']
     join_room(f'user_{uid}')
-    print(f'[WS] Utente {uid} connesso')
+    print(f'[WS] Connessione riuscita. Utente {uid}')
 
 @socketio.on('disconnect')
 def on_disconnect():
     uid = session.get('user_id')
     if uid:
         leave_room(f'user_{uid}')
-        print(f'[WS] Utente {uid} disconnesso')
+        print(f'[WS] Utente {uid} scollegato.')
 
 @socketio.on('messaggio_privato')
 def on_messaggio_privato(data):
@@ -918,40 +800,29 @@ def on_messaggio_privato(data):
     if not uid or not dest_id or not contenuto:
         return
 
-    conn = None
-    try:
-        conn = get_db()
-        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        cur.execute("SELECT id_utente,nome,cognome FROM utente WHERE id_utente=%s", (dest_id,))
-        dest_user = cur.fetchone()
-        if not dest_user:
-            cur.close()
-            return
+    with db_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT id_utente,nome,cognome FROM utente WHERE id_utente=%s",(dest_id,))
+            dest_user = cur.fetchone()
+            if not dest_user: return
 
-        cur.execute(
-            "INSERT INTO messaggio (id_mittente,id_destinatario,contenuto) VALUES (%s,%s,%s) "
-            "RETURNING id_messaggio, TO_CHAR(data_invio,'HH24:MI') AS ora",
-            (uid, dest_id, contenuto)
-        )
-        row_ = cur.fetchone()
-        conn.commit()
-        cur.close()
+            cur.execute(
+                "INSERT INTO messaggio (id_mittente,id_destinatario,contenuto) VALUES (%s,%s,%s) RETURNING id_messaggio,TO_CHAR(data_invio,'HH24:MI') AS ora",
+                (uid, dest_id, contenuto)
+            )
+            row_ = cur.fetchone()
+            conn.commit()
 
-        msg_payload = {
-            'id_messaggio': row_['id_messaggio'],
-            'id_mittente': uid,
-            'contenuto': contenuto,
-            'ora': row_['ora'],
-        }
+            msg_payload = {
+                'id_messaggio': row_['id_messaggio'],
+                'id_mittente':  uid,
+                'contenuto':    contenuto,
+                'ora':          row_['ora'],
+            }
 
-        emit('nuovo_messaggio', {**msg_payload, 'out': True}, room=f'user_{uid}')
-        emit('nuovo_messaggio', {**msg_payload, 'out': False}, room=f'user_{dest_id}')
-    except Exception as e:
-        if conn: conn.rollback()
-        print(f'[WS PRIVMSG ERROR] {e}')
-    finally:
-        if conn:
-            release_db(conn)
+            emit('nuovo_messaggio', {**msg_payload, 'out': True},  room=f'user_{uid}')
+            emit('nuovo_messaggio', {**msg_payload, 'out': False}, room=f'user_{dest_id}')
 
 if __name__ == '__main__':
+    seed_admin()
     socketio.run(app, debug=True, host='0.0.0.0', port=5000)

@@ -14,7 +14,7 @@
 </head>
 <body>
 
-<!-- SIDEBAR (completo) -->
+<!-- SIDEBAR -->
 <aside class="sidebar">
   <div class="sidebar-logo">
     <div class="logo-s">S</div>
@@ -57,15 +57,30 @@
 
 <div class="main-content">
   <div class="conv-panel">
-    <div class="conv-search-wrap">
+    
+    <!-- BARRA RICERCA UTENTE CON CODICE UNIVOCO ATTIVATA -->
+    <div class="conv-search-wrap" style="border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 14px; display:flex; flex-direction:column; gap:8px;">
       <div class="conv-search">
         <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><circle cx="11" cy="11" r="8" stroke="currentColor"/><path stroke-linecap="round" d="m21 21-4.35-4.35" stroke="currentColor"/></svg>
         <input type="text" id="conv-search-input" placeholder="Cerca conversazione..." oninput="filterConvs(this.value)"/>
       </div>
+      
+      <div style="display: flex; gap:6px;">
+        <div class="conv-search" style="flex:1; padding: 6px 10px;">
+          <input type="text" id="search-code-input" placeholder="Cerca Codice o @username..." style="font-size:0.8rem;"/>
+        </div>
+        <button onclick="startNewChatByCode()" style="background:#2584ff; border:none; color:white; font-size:0.78rem; font-weight:700; padding:0 12px; border-radius:10px; cursor:pointer;">Cerca</button>
+      </div>
     </div>
+    
     <div class="conv-list" id="conv-list"></div>
   </div>
-  <div class="chat-area" id="chat-area"></div>
+  <div class="chat-area" id="chat-area">
+    <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:rgba(255,255,255,0.3); font-size:0.95rem;">
+      <svg fill="none" viewBox="0 0 24 24" stroke-width="1.2" style="width:48px; height:48px; stroke:currentColor; margin-bottom:12px;"><path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" /></svg>
+      Seleziona una conversazione o cerca un utente con il suo codice per iniziare a chattare
+    </div>
+  </div>
 </div>
 
 <script src="/static/js/messaggi.js"></script>

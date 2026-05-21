@@ -14,7 +14,6 @@
 </head>
 <body>
 
-<!-- SIDEBAR -->
 <aside class="sidebar">
   <div class="sidebar-logo">
     <div class="avatar" id="sidebar-av">S</div>
@@ -59,17 +58,13 @@
   </div>
 </aside>
 
-<!-- MAIN -->
 <main class="main">
-
-  <!-- Top bar -->
   <div class="top-bar">
     <div>
       <h1 id="welcome-title">Bentornato!</h1>
       <p>Scopri cosa sta succedendo nella tua community oggi.</p>
     </div>
     <div class="top-bar-actions">
-      
       <button class="btn-primary" onclick="openModal()">
         <svg fill="none" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" stroke="currentColor"/></svg>
         Crea una Lezione
@@ -77,7 +72,6 @@
     </div>
   </div>
 
-  <!-- Stats -->
   <div class="stats-row" id="stats-container">
     <div class="stat-card">
       <div class="stat-icon blue">
@@ -108,30 +102,20 @@
     </div>
   </div>
 
-  <!-- Content -->
   <div class="content-row">
-
-    <!-- Lessons -->
     <div>
       <div class="section-header">
         <h2>Lezioni Consigliate</h2>
         <a href="/cerca">Vedi tutte</a>
       </div>
-
-      <div id="lezioni-container">
-        <!-- Lezioni caricate da JS -->
-      </div>
+      <div id="lezioni-container"></div>
     </div>
 
-    <!-- Skills panel -->
     <div class="skills-panel">
       <h2>Le Tue Skill</h2>
-      <div id="skill-container">
-        <!-- Skills caricate da JS -->
-      </div>
+      <div id="skill-container"></div>
       <a href="/profilo" class="add-skill">Aggiungi un'altra competenza</a>
     </div>
-
   </div>
 
 <!-- MODAL NUOVA LEZIONE -->
@@ -177,9 +161,10 @@
       </select>
     </div>
 
+    <!-- MODIFICA PLACEHOLDER LUOGO RICHIESTO -->
     <div class="modal-field">
-      <label>Luogo o Link</label>
-      <input type="text" id="modal-luogo" placeholder="Aula o link Meet" />
+      <label>Aula, Luogo o link Meet</label>
+      <input type="text" id="modal-luogo" placeholder="Es: Aula 3, Palestra o link Meet" />
     </div>
 
     <button class="btn-pubblica" onclick="publishLesson()">Pubblica Lezione</button>
