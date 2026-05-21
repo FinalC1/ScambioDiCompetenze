@@ -1,3 +1,4 @@
+// lesson.js - Risoluzione del crash per descrizioni vuote
 const lessonId = parseInt(window.location.pathname.split('/').pop());
 
 window.addEventListener('load', () => {
@@ -26,7 +27,7 @@ function renderLesson(data) {
     const l = data.lezione;
 
     document.getElementById('lesson-title').textContent = l.titolo;
-    document.getElementById('lesson-desc').textContent = l.descrizione;
+    document.getElementById('lesson-desc').textContent = l.descrizione || 'Nessuna descrizione fornita.';
     document.getElementById('hero-date').textContent = `${l.data_lezione} alle ${l.orario}`;
 
     const badgesHtml = `
@@ -38,15 +39,16 @@ function renderLesson(data) {
     document.getElementById('meta-data').textContent = l.data_lezione;
     document.getElementById('meta-orario').textContent = l.orario;
     document.getElementById('meta-posti').textContent = `${data.posti_disponibili} disponibili`;
-    document.getElementById('meta-luogo').textContent = l.luogo;
+    document.getElementById('meta-luogo').textContent = l.luogo || 'Non specificato';
 
-    // PRIVACY INSEGNANTE: mostra il codice univoco solo sotto il professore
+    // Codice docente visibile sotto il nome
     document.getElementById('teacher-name').innerHTML = `
     <div>${l.nome_insegnante}</div>
     <div style="font-size:0.75rem; color:rgba(255,255,255,0.4); margin-top:3px;">Codice chat: ${l.codice_docente || 'N/D'}</div>
   `;
 
-    const points = l.descrizione.split('\n').filter(p => p.trim());
+    // CHIAVE DI RISOLUZIONE CRASH: Gestione provvidenziale del valore nullo della descrizione
+    const points = (l.descrizione || '').split('\n').filter(p => p.trim());
     const learnHtml = points.length > 0 ?
         points.map(p => `<li><svg fill="none" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" stroke="currentColor"/></svg>${p}</li>`).join('') :
         '<li><svg fill="none" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" stroke="currentColor"/></svg>Impara contenuti interessanti</li>';
@@ -68,7 +70,7 @@ function renderLesson(data) {
         '<p style="color: var(--text-sub); font-size: 0.9rem;">Nessun materiale disponibile.</p>';
     document.getElementById('materiali-container').innerHTML = materialiHtml;
 
-    // PRIVACY ALUNNI: nasconde i loro nomi reali e il codice univoco, mostrando solo l'username
+    // Mostra solo gli username degli studenti partecipanti
     const partecipantiHtml = data.partecipanti.length > 0 ?
         data.partecipanti.map(p => `
         <div class="participant">
@@ -166,7 +168,6 @@ function cancelBooking() {
 }
 
 function contactTeacher(teacherId, teacherName) {
-    // Avvia direttamente la chat con il professore
     sessionStorage.setItem('sb_direct_chat_id', teacherId);
     sessionStorage.setItem('sb_direct_chat_name', teacherName);
     window.location.href = '/messaggi';

@@ -3,7 +3,7 @@ from gevent import monkey
 monkey.patch_all()
 
 """
-SkillBridge - app.py (Versione Unificata con Logout Sicuro e Vecchio SMTP casuale a 6 cifre)
+SkillBridge - app.py (Versione Presentazione Finale Unificata e Corretta)
 """
 
 import os
@@ -22,7 +22,7 @@ import psycopg2.extras
 import smtplib as smtp
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
-app.secret_key = "chiave_segreta_skillbridge_2024" # Configurazione Secret Key robusta richiesto
+app.secret_key = "chiave_segreta_skillbridge_2024"
 
 socketio = SocketIO(app,
     cors_allowed_origins='*',
@@ -82,7 +82,7 @@ def genera_codice():
     h = secrets.token_hex(4).upper()
     return f"SB-{h[:4]}-{h[4:]}"
 
-# CHIAVE DI RISOLUZIONE: Invio Email con Vecchio Script SMTP
+# Invio Email con Vecchio Script SMTP
 def send_welcome_email_smtp(dest, nome):
     try:
         server = smtp.SMTP("smtp.gmail.com", 587, timeout=10)
@@ -91,7 +91,7 @@ def send_welcome_email_smtp(dest, nome):
         msg = (
             f"Subject: Benvenuto in SkillBridge!\n\n"
             f"Ciao {nome},\n\n"
-            f"Benvenuto in SkillBridge! Il tuo account è stato creato con successo.\n"
+            f"Benvenuto in SkillBridge! Il tuo account e' stato creato con successo.\n"
             f"Puoi ora accedere, cercare lezioni, insegnare le tue competenze e molto altro.\n\n"
             f"Buon apprendimento!\n"
             f"Il team di SkillBridge"
@@ -308,7 +308,7 @@ def api_register():
             send_welcome_email_smtp(email, nome)
             return ok(message=f'Registrazione completata!')
 
-# CHIAVE DI RISOLUZIONE: ROTTA DI LOGOUT SICURA CHE ELIMINA LA SESSIONE E PULISCE LA CACHE
+# ROTTA DI LOGOUT SICURA
 @app.route('/logout', methods=['GET', 'POST'])
 @app.route('/api/logout', methods=['GET', 'POST'])
 def api_logout():
@@ -326,7 +326,7 @@ def api_me():
                     'cognome': session.get('user_cognome',''), 'username': session.get('user_username','')})
 
 # ─────────────────────────────────────────────────────────────────────────────
-# API: RESET PASSWORD (MOCK + SECURE GENERATOR)
+# API: RESET PASSWORD (OTP MOCKATO)
 # ─────────────────────────────────────────────────────────────────────────────
 @app.route('/api/reset-password/richiedi', methods=['POST'])
 def api_reset_richiedi():
@@ -343,7 +343,7 @@ def api_reset_richiedi():
             cur.execute("UPDATE reset_password SET usato=TRUE WHERE id_utente=%s AND usato=FALSE", (user['id_utente'],))
             token = secrets.token_urlsafe(32)
             
-            # Generatore a 6 cifre casuale robusto richiesto
+            # Generatore a 6 cifre casuale robusto
             codice = str(random.randint(100000, 999999))
             
             scad = datetime.now() + timedelta(minutes=15)
@@ -351,7 +351,7 @@ def api_reset_richiedi():
                         (user['id_utente'], token, codice, scad))
             conn.commit()
             
-            # Prova a spedire con SMTP originale, ma restituisce mock_otp al sito per sicurezza
+            # Spedisce con SMTP originale
             send_otp_email_smtp(email, codice)
             return ok(token=token, mock_otp=codice, message='Codice generato con successo per la demo!')
 
@@ -655,6 +655,35 @@ def api_aggiorna_profilo():
     session['user_cognome'] = cognome
     if username: session['user_username'] = username
     return ok(message='Profilo aggiornato!')
+
+# CHIAVE DI RISOLUZIONE: MAPPATURA LIVELLO COMPETENZE E RIMOZIONE DI CHECK STRICT IN PYTHON
+@app.route('/api/competenze/aggiungi', methods=['POST'])
+@login_required
+def api_aggiungi_comp():
+    d = request.get_json() or {}
+    uid = session['user_id']
+    if not d.get('id_competenza'): return err('Seleziona una competenza')
+    
+    livello = d.get('livello', 'Intermedio')
+    tipo = d.get('tipo', 'Offerta')
+    
+    # Adattamento dei fusi per superare i Check Constraints di PostgreSQL
+    if livello == 'Principiante': livello = 'Base'
+    if livello == 'Esperto': livello = 'Avanzato'
+    
+    with db_conn() as conn:
+        with conn.cursor() as cur:
+            try:
+                cur.execute("INSERT INTO utente_competenza (id_utente,id_competenza,livello,tipo) VALUES (%s,%s,%s,%s)",
+                            (uid, d['id_competenza'], livello, tipo))
+                conn.commit()
+            except psycopg2.errors.UniqueViolation:
+                conn.rollback()
+            except Exception as e:
+                conn.rollback()
+                print(f"[COMPETENZA INSERT EXCEPTION] {e}")
+                return err('Errore nel salvataggio della competenza')
+    return ok(message='Competenza salvata con successo!')
 
 # ─────────────────────────────────────────────────────────────────────────────
 # API: MESSAGGI (RICERCA E INVIO VIA HTTP ROBUSTO)

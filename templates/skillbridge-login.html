@@ -10,13 +10,60 @@
   <link rel="apple-touch-icon" href="/static/icons/icon-152x152.png">
   <link rel="stylesheet" href="/static/css/login.css">
   <link rel="stylesheet" href="/static/css/common.css">
-
+  <style>
+    /* Stili dello Splash Screen */
+    #splash-screen {
+      position: fixed;
+      inset: 0;
+      background: #060f1a;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      transition: opacity 0.8s ease, visibility 0.8s ease;
+    }
+    #splash-screen.fade-out {
+      opacity: 0;
+      visibility: hidden;
+    }
+    .splash-logo {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: #2584ff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.5rem;
+      font-weight: 800;
+      color: #fff;
+      box-shadow: 0 0 0 6px rgba(37,132,255,0.2),
+                  0 0 30px rgba(37,132,255,0.6);
+      animation: pulse 1.5s infinite alternate;
+    }
+    .splash-title {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: #fff;
+      margin-top: 20px;
+      letter-spacing: 0.05em;
+    }
+    @keyframes pulse {
+      from { transform: scale(1); }
+      to { transform: scale(1.08); }
+    }
+  </style>
 </head>
 <body>
 
-  <div class="card">
+  <!-- SPLASH SCREEN ANIMATO (Dissolvenza automatica dopo 2 secondi) -->
+  <div id="splash-screen">
+    <div class="splash-logo">S</div>
+    <div class="splash-title">SkillBridge</div>
+  </div>
 
-    <!-- Lock icon -->
+  <div class="card">
     <div class="icon-wrap">
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
            stroke-width="1.8" stroke="currentColor">
@@ -56,10 +103,18 @@
       <a href="/reset-password">Password dimenticata?</a>
       <span class="register">Nuovo qui? <a href="/register">Registrati ora</a></span>
     </div>
-
   </div>
 
-    <script src="/static/js/login.js"></script>
-    <script src="/static/js/pwa_init.js"></script>
+  <script>
+    // Dissolvenza automatica dello splash screen dopo 2 secondi
+    window.addEventListener('DOMContentLoaded', () => {
+      setTimeout(() => {
+        const splash = document.getElementById('splash-screen');
+        if (splash) splash.classList.add('fade-out');
+      }, 2000);
+    });
+  </script>
+  <script src="/static/js/login.js"></script>
+  <script src="/static/js/pwa_init.js"></script>
 </body>
 </html>
