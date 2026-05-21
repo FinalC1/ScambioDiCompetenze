@@ -3,13 +3,14 @@ from gevent import monkey
 monkey.patch_all()
 
 """
-SkillBridge - app.py (Versione Finale con Pannello Admin, Sicurezza e Validazione Date)
+SkillBridge - app.py (Versione Presentazione con Simulatore di Email)
 """
 
 import os
 import re
 import secrets
 import hashlib
+import json
 from datetime import date, datetime, timedelta
 from functools import wraps
 from contextlib import contextmanager
@@ -18,9 +19,6 @@ from flask import Flask, send_from_directory, request, redirect, session, jsonif
 from flask_socketio import SocketIO, emit, join_room, leave_room
 import psycopg2
 import psycopg2.extras
-import smtplib as smtp
-from email.mime.text import MIMEText
-from email.header import Header
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 app.secret_key = os.environ.get('SECRET_KEY', 'skillbridge_secret_2024')
@@ -37,10 +35,6 @@ DB_URL = os.environ.get(
     'postgresql://postgres:PASSWORD@HOST:6543/postgres'
 )
 
-MAIL_FROM = os.environ.get('MAIL_FROM', 'skillbridge.einaudi@gmail.com')
-MAIL_PASS = os.environ.get('MAIL_PASS', 'jwlu iret icve xuea')
-
-# Lista estesa per moderazione contenuti
 PAROLACCE = [
     'cazzo','minchia','vaffanculo','stronzo','stronza','merda','coglione',
     'bastardo','bastarda','puttana','fanculo','frocio','troia','cagna',
@@ -48,7 +42,6 @@ PAROLACCE = [
     'inappropriato','porno','allusioni_volgari','puttane'
 ]
 
-# GESTORE DI CONTESTO PER EVITARE SATURAZIONE DELLE CONNESSIONI
 @contextmanager
 def db_conn():
     conn = psycopg2.connect(DB_URL)
@@ -84,24 +77,6 @@ def genera_codice():
     h = secrets.token_hex(4).upper()
     return f"SB-{h[:4]}-{h[4:]}"
 
-def send_email(dest, subject, body):
-    try:
-        msg = MIMEText(body, 'plain', 'utf-8')
-        msg['Subject'] = Header(subject, 'utf-8')
-        msg['From'] = MAIL_FROM
-        msg['To'] = dest
-
-        s = smtp.SMTP('smtp.gmail.com', 587, timeout=10)
-        s.starttls()
-        s.login(MAIL_FROM, MAIL_PASS)
-        s.sendmail(MAIL_FROM, [dest], msg.as_string())
-        s.quit()
-        print(f"[MAIL] Email inviata a {dest}")
-        return True
-    except Exception as e:
-        print(f'[MAIL ERROR] {e}')
-        return False
-
 # Decoratori Sicurezza
 def login_required(f):
     @wraps(f)
@@ -131,22 +106,6 @@ def page_guard(f):
 
 def ok(**kw):    return jsonify({'ok': True,  **kw})
 def err(m, c=400): return jsonify({'ok': False, 'error': m}), c
-
-# ─────────────────────────────────────────────────────────────────────────────
-# SEED ADMIN UTENTE
-# ─────────────────────────────────────────────────────────────────────────────
-def seed_admin():
-    with db_conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT id_utente FROM utente WHERE username='adminsskill'")
-            if not cur.fetchone():
-                cur.execute(
-                    "INSERT INTO utente (nome, cognome, email, password, username, codice_univoco, data_registrazione, descrizione_profilo) "
-                    "VALUES ('Admin', 'SkillBridge', 'admin@skillbridge.it', %s, 'adminsskill', 'SB-ADMIN-SB99', %s, 'Amministratore di Sistema')",
-                    (hash_pw('AdminBridge4!'), date.today())
-                )
-                conn.commit()
-                print("[INIT] Account Amministratore creato con successo.")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # ROTTE WEB & PWA
@@ -285,12 +244,7 @@ def api_register():
                 (nome, cognome, email, hash_pw(pw), censura(bio), username, codice, date.today())
             )
             conn.commit()
-            
-            mail_sent = send_email(email, 'Benvenuto in SkillBridge!', 
-                f'Ciao {nome},\n\nBenvenuto in SkillBridge!\nCodice univoco: {codice}\n\nIl team di SkillBridge')
-            if not mail_sent:
-                print("[WARNING] Registrazione completata ma email non spedita.")
-            return ok(message='Registrazione completata!')
+            return ok(message=f'Registrazione completata! Codice assegnato: {codice}')
 
 @app.route('/api/logout', methods=['GET','POST'])
 def api_logout():
@@ -304,7 +258,7 @@ def api_me():
                     'cognome': session.get('user_cognome',''), 'username': session.get('user_username','')})
 
 # ─────────────────────────────────────────────────────────────────────────────
-# API: RESET PASSWORD (OTP)
+# API: RESET PASSWORD (MOCK - CHIAVE DI RISOLUZIONE FUNZIONAMENTO OTP)
 # ─────────────────────────────────────────────────────────────────────────────
 @app.route('/api/reset-password/richiedi', methods=['POST'])
 def api_reset_richiedi():
@@ -326,11 +280,9 @@ def api_reset_richiedi():
                         (user['id_utente'], token, codice, scad))
             conn.commit()
             
-            # Impedisce l'avanzamento se l'invio fallisce effettivamente
-            if send_email(email, 'SkillBridge — Codice Reset Password', f'Codice di verifica: {codice}'):
-                return ok(token=token, message='Codice inviato!')
-            else:
-                return err("Errore nell'invio dell'email. Riprova tra pochi istanti.")
+            # Modalità Presentazione: restituiamo il codice direttamente nella risposta JSON!
+            # Il Javascript mostrerà un popup di avviso con il codice per permetterti di provarlo all'istante.
+            return ok(token=token, mock_otp=codice, message='Codice generato con successo per la demo!')
 
 @app.route('/api/reset-password/verifica', methods=['POST'])
 def api_reset_verifica():
@@ -443,7 +395,6 @@ def api_crea_lezione():
     if not titolo or not d.get('data_lezione') or not d.get('orario'):
         return err('Titolo, data e orario obbligatori')
     
-    # VALIDAZIONE DATA DELLA LEZIONE (Minimo domani, Massimo 1 Anno da oggi)
     try:
         data_lez = datetime.strptime(d['data_lezione'], '%Y-%m-%d').date()
         oggi = date.today()
@@ -486,7 +437,6 @@ def api_lezione_detail(id):
             if not l: return err('Lezione non trovata', 404)
             l = dict(l)
             
-            # PRIVACY ALUNNI: Seleziona SOLO l'username (nasconde nome reale e codice chat privato)
             cur.execute("""SELECT u.id_utente, u.username FROM prenotazione p
                            JOIN utente u ON p.id_utente=u.id_utente
                            WHERE p.id_lezione=%s AND p.stato='Confermata'""", (id,))
@@ -636,7 +586,7 @@ def api_aggiorna_profilo():
     return ok(message='Profilo aggiornato!')
 
 # ─────────────────────────────────────────────────────────────────────────────
-# API: MESSAGGI (RICERCA CON CODICE UNIVOCO ATTIVA)
+# API: MESSAGGI
 # ─────────────────────────────────────────────────────────────────────────────
 @app.route('/api/utenti/cerca')
 @login_required
@@ -654,7 +604,7 @@ def api_cerca_utente():
             u = cur.fetchone()
             if not u: return err('Nessun utente trovato con questo codice o username', 404)
             return ok(utente={'id': u['id_utente'], 'nome': u['nome'], 'cognome': u['cognome'],
-                              'username': u.get('username',''), 'descrizione': u.get('descrizione_profilo','')})
+                              'username': u.get('username',''), 'descrizione': u.get('descrizione_profilo',''), 'codice_univoco': u['codice_univoco']})
 
 @app.route('/api/messaggi/conversazioni')
 @login_required
@@ -708,7 +658,7 @@ def api_chat(other_id):
             return ok(messaggi=msgs, interlocutore=dict(other), last_id=last_id, my_user_id=uid)
 
 # ─────────────────────────────────────────────────────────────────────────────
-# GESTIONE ADMIN: ENDPOINTS CRUD (PROTETTI DA RUOLO)
+# GESTIONE ADMIN: ENDPOINTS CRUD
 # ─────────────────────────────────────────────────────────────────────────────
 @app.route('/api/admin/utenti', methods=['GET'])
 @admin_required
@@ -789,7 +739,7 @@ def on_disconnect():
     uid = session.get('user_id')
     if uid:
         leave_room(f'user_{uid}')
-        print(f'[WS] Utente {uid} scollegato.')
+        print(f'[WS] Utente {uid} disconnesso')
 
 @socketio.on('messaggio_privato')
 def on_messaggio_privato(data):
@@ -824,5 +774,4 @@ def on_messaggio_privato(data):
             emit('nuovo_messaggio', {**msg_payload, 'out': False}, room=f'user_{dest_id}')
 
 if __name__ == '__main__':
-    seed_admin()
     socketio.run(app, debug=True, host='0.0.0.0', port=5000)

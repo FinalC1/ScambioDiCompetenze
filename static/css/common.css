@@ -1,41 +1,77 @@
+/* --- OTTIMIZZAZIONI DISPOSITIVI MOBILI --- */
+
 @media (max-width: 768px) {
-  .sidebar {
-    width: 70px;
-  }
-  .sidebar-logo span,
-  .sidebar-section-label,
-  .nav-item span {
-    display: none;
-  }
-  .nav-item svg {
-    margin: 0 auto;
-  }
-  .main {
-    margin-left: 70px;
-    padding: 20px;
-  }
-  .content-row,
-  .layout {
-    grid-template-columns: 1fr;
-  }
-  .lesson-card {
-    flex-direction: column;
-  }
-  .lesson-thumb-placeholder {
-    width: 100%;
-    height: auto;
-  }
-  .stats-row {
-    grid-template-columns: 1fr;
-  }
-  .conv-panel {
-    width: 100%;
-    margin-bottom: 20px;
-  }
-  .main-content {
-    flex-direction: column;
-  }
-  .chat-area {
-    width: 100%;
-  }
+    body {
+        flex-direction: column-reverse;
+        /* Sposta la sidebar in basso come barra di navigazione nativa */
+    }
+    .sidebar {
+        width: 100% !important;
+        height: 60px !important;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        flex-direction: row !important;
+        justify-content: space-around;
+        padding: 0 !important;
+        background: #080f18;
+        z-index: 9999;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        border-right: none !important;
+    }
+    .sidebar-logo,
+    .sidebar-section-label,
+    .sidebar-spacer,
+    .sb-space {
+        display: none !important;
+    }
+    .sidebar-sec,
+    .sidebar-section {
+        display: flex;
+        width: 100%;
+        justify-content: space-around;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+    .nav-item {
+        padding: 10px !important;
+        font-size: 0.8rem;
+        flex-direction: column;
+        gap: 2px !important;
+    }
+    .sb-out,
+    .sidebar-logout {
+        margin: 0 !important;
+    }
+    .main {
+        margin-left: 0 !important;
+        padding: 16px 16px 80px 16px !important;
+        /* Spazio in basso per non coprire il contenuto con la barra */
+    }
+    /* Layout chat responsivo */
+    .main-content {
+        flex-direction: column !important;
+        height: calc(100vh - 80px) !important;
+        padding: 10px !important;
+    }
+    .conv-panel {
+        width: 100% !important;
+        height: 220px !important;
+    }
+    .chat-area {
+        width: 100% !important;
+        height: calc(100vh - 320px) !important;
+    }
+    .stats-row {
+        grid-template-columns: 1fr !important;
+        gap: 12px;
+    }
+    .layout {
+        grid-template-columns: 1fr !important;
+    }
+    .info-card {
+        position: relative !important;
+        top: 0 !important;
+    }
 }

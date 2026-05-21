@@ -1,9 +1,10 @@
+// socket_chat.js
 const socket = io({
     transports: ['websocket', 'polling'],
     reconnection: true
 });
 
-socket.on('connect', () => console.log('[WS] Connesso al server'));
+socket.on('connect', () => console.log('[WS] Connesso al server Socket.IO'));
 socket.on('disconnect', () => console.log('[WS] Disconnesso'));
 
 socket.on('nuovo_messaggio', (msg) => {
@@ -27,7 +28,7 @@ socket.on('nuovo_messaggio', (msg) => {
 window.sendMessage = function() {
     if (!window.activeChatId) return;
     const inp = document.getElementById('chat-input');
-    const text = inp ? .value.trim();
+    const text = inp ? inp.value.trim() : '';
     if (!text) return;
 
     const container = document.getElementById('chat-msgs');
@@ -39,11 +40,13 @@ window.sendMessage = function() {
     div.className = 'msg-out msg-item';
     div.setAttribute('data-id', tempId);
     div.innerHTML = `<div class="bbl">${escapeHtml(text)}</div><div class="ts">${ora}</div>`;
+
     if (container) {
         container.appendChild(div);
         container.scrollTop = container.scrollHeight;
     }
-    inp.value = '';
+
+    if (inp) inp.value = '';
 
     socket.emit('messaggio_privato', {
         destinatario_id: window.activeChatId,
