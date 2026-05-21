@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>SkillBridge – Mobile</title>
+  <link rel="stylesheet" href="/static/css/common.css">
+  <link rel="stylesheet" href="/static/css/admin.css">
+  <style>
+    body { background: #060f1a; font-family: 'Inter', sans-serif; color: white; display: flex; flex-direction: column; min-height: 100vh; margin: 0; overflow-x: hidden; }
+    
+    /* Top Bar stile Instagram */
+    .mobile-top-bar { height: 50px; background: #080f18; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: space-between; padding: 0 16px; position: fixed; top: 0; left: 0; right: 0; z-index: 1000; }
+    .mobile-logo { font-size: 1.25rem; font-weight: 800; letter-spacing: 0.05em; color: #2584ff; text-transform: uppercase; }
+    
+    /* Container Contenuto principale per telefono */
+    .mobile-main { margin-top: 50px; margin-bottom: 65px; flex: 1; padding: 16px; box-sizing: border-box; }
+    
+    /* Barra Inferiore Fissa (Instagram Style Navigation Bar) */
+    .mobile-nav-bar { position: fixed; bottom: 0; left: 0; right: 0; height: 65px; background: #080f18; border-top: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-around; align-items: center; z-index: 9999; }
+    .nav-btn { background: none; border: none; color: rgba(255,255,255,0.5); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 0.75rem; text-decoration: none; flex: 1; height: 100%; }
+    .nav-btn.active { color: #2584ff; font-weight: 700; }
+    .nav-btn svg { width: 22px; height: 22px; stroke: currentColor; }
+    
+    /* Sezioni tabulate dell'app */
+    .mobile-tab-section { display: none; }
+    .mobile-tab-section.active { display: block; }
+    
+    /* Stili per la chat responsiva mobile (Instagram Direct) */
+    .m-main-content { display: flex; flex-direction: column; height: calc(100vh - 115px); overflow: hidden; }
+    .m-main-content.chat-open .m-conv-panel { display: none; }
+    .m-main-content:not(.chat-open) .m-chat-area { display: none; }
+    
+    .m-conv-panel, .m-chat-area { width: 100%; height: 100%; display: flex; flex-direction: column; }
+    .m-conv-list { flex: 1; overflow-y: auto; padding-top: 10px; }
+    .m-conv-item { display: flex; align-items: center; gap: 12px; padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.04); cursor: pointer; }
+    .m-conv-av { width: 40px; height: 40px; border-radius: 50%; background: #102a3f; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.95rem; }
+    
+    .m-chat-msgs { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+    .m-chat-bar { padding: 10px; border-top: 1px solid rgba(255,255,255,0.05); display: flex; gap: 8px; align-items: center; background: #080f18; position: fixed; bottom: 65px; left: 0; right: 0; z-index: 999; }
+    .m-inp-wrap { flex: 1; background: rgba(255,255,255,0.05); border-radius: 20px; padding: 0 14px; border: 1px solid rgba(255,255,255,0.1); }
+    .m-inp-wrap input { width: 100%; background: none; border: none; color: white; padding: 10px 0; outline: none; font-size: 0.9rem; }
+    .m-send-btn { width: 36px; height: 36px; border-radius: 50%; background: #2584ff; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+    
+    /* Card per Lezioni */
+    .m-card { background: #0d1f2f; border: 1px solid rgba(255,255,255,0.07); border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+    .m-btn { background: #2584ff; border: none; color: white; padding: 8px 16px; border-radius: 8px; font-weight: 600; font-size: 0.85rem; width: 100%; margin-top: 10px; cursor: pointer; }
+  </style>
+</head>
+<body>
+
+  <!-- Top Bar fissa -->
+  <div class="mobile-top-bar">
+    <div class="mobile-logo">SkillBridge</div>
+    <a href="/logout" style="color: #ff5555; text-decoration: none; font-size: 0.85rem; font-weight: 700;">Esci</a>
+  </div>
+
+  <main class="mobile-main">
+    
+    <!-- TAB 1: HOME/DASHBOARD -->
+    <div id="tab-home" class="mobile-tab-section active">
+      <h2 style="font-size:1.35rem; margin-bottom:15px;">Bentornato!</h2>
+      <div style="display:grid; grid-template-columns:1fr; gap:10px; margin-bottom:20px;">
+        <div class="m-card" style="display:flex; justify-content:space-between; align-items:center;">
+          <span>Punti accumulati:</span><strong id="m-punti" style="color:#2584ff; font-size:1.25rem;">0</strong>
+        </div>
+        <div class="m-card" style="display:flex; justify-content:space-between; align-items:center;">
+          <span>Lezioni frequentate:</span><strong id="m-freq-count" style="color:#1db97b; font-size:1.25rem;">0</strong>
+        </div>
+      </div>
+      
+      <h3 style="font-size:1.1rem; margin-bottom:10px; color:rgba(255,255,255,0.6);">Consigliate per te</h3>
+      <div id="m-consigliate-container"></div>
+    </div>
+
+    <!-- TAB 2: CERCA -->
+    <div id="tab-cerca" class="mobile-tab-section">
+      <h2 style="font-size:1.35rem; margin-bottom:15px;">Trova lezioni</h2>
+      <div class="conv-search" style="padding: 10px; background:rgba(255,255,255,0.05); border-radius:10px; border:1px solid rgba(255,255,255,0.1); display:flex; align-items:center; gap:8px; margin-bottom:15px;">
+        <input type="text" id="m-search-input" placeholder="Cerca corsi, materie..." oninput="searchLezioniMobile(this.value)" style="background:none; border:none; color:white; outline:none; font-size:0.9rem; width:100%;" />
+      </div>
+      <div id="m-search-results"></div>
+    </div>
+
+    <!-- TAB 3: LE MIE LEZIONI -->
+    <div id="tab-lezioni" class="mobile-tab-section">
+      <h2 style="font-size:1.35rem; margin-bottom:15px;">I tuoi corsi</h2>
+      <div id="m-mie-lezioni-container"></div>
+    </div>
+
+    <!-- TAB 4: DIRECT (CHAT - WhatsApp/Instagram Style) -->
+    <div id="tab-messaggi" class="mobile-tab-section">
+      <div class="m-main-content" id="m-chat-layout">
+        
+        <!-- Lista Conversazioni -->
+        <div class="m-conv-panel">
+          <div style="display: flex; gap:6px; margin-bottom:12px;">
+            <div class="conv-search" style="flex:1; padding: 6px 10px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:10px;">
+              <input type="text" id="m-search-code-input" placeholder="Codice o @username..." style="background:none; border:none; color:white; outline:none; font-size:0.8rem; width:100%;"/>
+            </div>
+            <button onclick="mStartNewChat()" style="background:#2584ff; border:none; color:white; font-size:0.78rem; font-weight:700; padding:0 12px; border-radius:10px; cursor:pointer;">Avvia</button>
+          </div>
+          <div class="m-conv-list" id="m-conv-list"></div>
+        </div>
+        
+        <!-- Finestra Messaggi a Schermo Intero -->
+        <div class="m-chat-area">
+          <div class="chat-hdr" style="display:flex; align-items:center; justify-content:space-between; padding-bottom:10px; border-bottom:1px solid rgba(255,255,255,0.05);">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <button onclick="mCloseChat()" style="background:none; border:none; color:#2584ff; padding:4px; cursor:pointer;">
+                <svg fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" style="width:20px; height:20px;"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" /></svg>
+              </button>
+              <div class="m-conv-av" id="m-active-av" style="width:32px; height:32px; font-size:0.8rem;">A</div>
+              <strong id="m-active-name" style="font-size:0.9rem;">Chat</strong>
+            </div>
+          </div>
+          <div class="m-chat-msgs" id="m-chat-msgs"></div>
+          <div class="m-chat-bar">
+            <div class="m-inp-wrap">
+              <input type="text" id="m-chat-input" placeholder="Scrivi un messaggio..." onkeydown="if(event.key==='Enter') mSendMessage()"/>
+            </div>
+            <button class="m-send-btn" onclick="mSendMessage()">
+              <svg viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" style="width:16px; height:16px; stroke:white;"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5"/></svg>
+            </button>
+          </div>
+        </div>
+        
+      </div>
+    </div>
+
+    <!-- TAB 5: PROFILO -->
+    <div id="tab-profilo" class="mobile-tab-section">
+      <div style="display:flex; align-items:center; gap:16px; margin-bottom:20px;">
+        <div class="m-conv-av" id="m-my-av" style="width:60px; height:60px; font-size:1.5rem; background:#2584ff;">M</div>
+        <div>
+          <h2 id="m-my-name" style="font-size:1.25rem; margin:0;">Caricamento...</h2>
+          <span id="m-my-username" style="color:rgba(255,255,255,0.4); font-size:0.85rem;">@username</span>
+        </div>
+      </div>
+      <div class="m-card">
+        <h3 style="font-size:0.95rem; margin-top:0; margin-bottom:8px; color:rgba(255,255,255,0.6);">Biografia</h3>
+        <p id="m-my-bio" style="font-size:0.85rem; margin:0; line-height:1.4;">Bio dell'utente</p>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Barra di Navigazione inferiore (Instagram style) -->
+  <nav class="mobile-nav-bar">
+    <button class="nav-btn active" onclick="switchMobileTab('home', this)">
+      <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" /></svg>
+      Home
+    </button>
+    <button class="nav-btn" onclick="switchMobileTab('cerca', this)">
+      <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><circle cx="11" cy="11" r="8" /><path stroke-linecap="round" d="m21 21-4.35-4.35" /></svg>
+      Cerca
+    </button>
+    <button class="nav-btn" onclick="switchMobileTab('lezioni', this)">
+      <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" /></svg>
+      Corsi
+    </button>
+    <button class="nav-btn" onclick="switchMobileTab('messaggi', this)">
+      <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.76c0 1.6 1.123 2.994 2.707 3.227 1.068.157 2.148.279 3.238.364.466.037.893.281 1.153.671L12 21l2.652-3.978c.26-.39.687-.634 1.153-.67 1.09-.086 2.17-.208 3.238-.365 1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" /></svg>
+      Direct
+    </button>
+    <button class="nav-btn" onclick="switchMobileTab('profilo', this)">
+      <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" /></svg>
+      Profilo
+    </button>
+  </nav>
+
+  <!-- SCRIPT DI NAVIGAZIONE E CHAT MOBILE -->
+  <script>
+    let mActiveChatId = null;
+    let mPolling = null;
+
+    function switchMobileTab(tabId, btn) {
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.mobile-tab-section').forEach(s => s.classList.remove('active'));
+      
+      btn.classList.add('active');
+      document.getElementById('tab-' + tabId).classList.add('active');
+      
+      if (tabId === 'home') loadHomeMobile();
+      if (tabId === 'cerca') searchLezioniMobile('');
+      if (tabId === 'lezioni') loadMieLezioniMobile();
+      if (tabId === 'messaggi') loadConversationsMobile();
+      if (tabId === 'profilo') loadProfiloMobile();
+    }
+
+    function loadHomeMobile() {
+      fetch('/api/dashboard')
+        .then(r => r.json())
+        .then(data => {
+          if (data.ok) {
+            document.getElementById('m-punti').textContent = data.stats.punti;
+            document.getElementById('m-freq-count').textContent = data.stats.lezioni_frequentate;
+            
+            document.getElementById('m-consigliate-container').innerHTML = data.lezioni_consigliate.map(l => `
+              <div class="m-card" onclick="window.location.href='/lezione/${l.id_lezione}'">
+                <h4 style="margin:0 0 6px 0; color:#2584ff;">${l.titolo}</h4>
+                <p style="font-size:0.8rem; color:rgba(255,255,255,0.5); margin:0 0 8px 0;">${l.descrizione.substring(0,60)}...</p>
+                <div style="font-size:0.75rem; color:rgba(255,255,255,0.3); display:flex; justify-content:space-between;">
+                  <span>Insegnante: ${l.nome_insegnante}</span>
+                  <span>${l.data_lezione}</span>
+                </div>
+              </div>
+            `).join('');
+          }
+        });
+    }
+
+    function searchLezioniMobile(q) {
+      fetch(`/api/lezioni?q=${encodeURIComponent(q)}`)
+        .then(r => r.json())
+        .then(data => {
+          if (data.ok) {
+            document.getElementById('m-search-results').innerHTML = data.lezioni.map(l => `
+              <div class="m-card" onclick="window.location.href='/lezione/${l.id_lezione}'">
+                <h4 style="margin:0 0 4px 0;">${l.titolo}</h4>
+                <span style="font-size:0.75rem; background:rgba(37,132,255,0.15); color:#2584ff; padding:2px 8px; border-radius:10px;">${l.categoria || 'Corso'}</span>
+                <p style="font-size:0.8rem; margin:8px 0 0 0; color:rgba(255,255,255,0.5);">${l.descrizione}</p>
+              </div>
+            `).join('');
+          }
+        });
+    }
+
+    function loadMieLezioniMobile() {
+      fetch('/api/mie-lezioni')
+        .then(r => r.json())
+        .then(data => {
+          if (data.ok) {
+            const all = [...data.frequentando, ...data.insegnando];
+            document.getElementById('m-mie-lezioni-container').innerHTML = all.map(l => `
+              <div class="m-card" onclick="window.location.href='/lezione/${l.id_lezione}'">
+                <h4 style="margin:0 0 4px 0;">${l.titolo}</h4>
+                <span style="font-size:0.72rem; border:1px solid rgba(255,255,255,0.2); padding:2px 6px; border-radius:10px; color:rgba(255,255,255,0.5);">${l.modalita}</span>
+                <div style="font-size:0.75rem; color:rgba(255,255,255,0.3); margin-top:8px;">Data: ${l.data_lezione}</div>
+              </div>
+            `).join('');
+          }
+        });
+    }
+
+    function loadConversationsMobile() {
+      fetch('/api/messaggi/conversazioni')
+        .then(r => r.json())
+        .then(data => {
+          if (data.ok) {
+            document.getElementById('m-conv-list').innerHTML = data.conversazioni.map(c => `
+              <div class="m-conv-item" onclick="mOpenChat(${c.id_utente}, '${c.nome.replace(/'/g, "\\'")}')">
+                <div class="m-conv-av">${c.nome.charAt(0).toUpperCase()}</div>
+                <div>
+                  <strong style="font-size:0.85rem; display:block;">${c.nome}</strong>
+                  <span style="font-size:0.75rem; color:rgba(255,255,255,0.4);">${c.ultimo_msg || 'Avvia una conversazione'}</span>
+                </div>
+              </div>
+            `).join('');
+          }
+        });
+    }
+
+    function mStartNewChat() {
+      const q = document.getElementById('m-search-code-input').value.trim();
+      if (!q) return;
+      fetch(`/api/utenti/cerca?q=${encodeURIComponent(q)}`)
+        .then(r => r.json())
+        .then(data => {
+          if (data.ok) {
+            mOpenChat(data.utente.id, data.utente.nome);
+          } else {
+            alert("Nessun utente trovato.");
+          }
+        });
+    }
+
+    function mOpenChat(userId, userName) {
+      mActiveChatId = userId;
+      document.getElementById('m-chat-layout').classList.add('chat-open');
+      document.getElementById('m-active-av').textContent = userName.charAt(0).toUpperCase();
+      document.getElementById('m-active-name').textContent = userName;
+      
+      mFetchMessages(userId, true);
+      
+      if (mPolling) clearInterval(mPolling);
+      mPolling = setInterval(() => {
+        if (mActiveChatId === userId) mFetchMessages(userId, false);
+      }, 2500);
+    }
+
+    function mFetchMessages(userId, scroll) {
+      fetch(`/api/messaggi/chat/${userId}`)
+        .then(r => r.json())
+        .then(data => {
+          if (data.ok) {
+            const container = document.getElementById('m-chat-msgs');
+            container.innerHTML = data.messaggi.map(m => `
+              <div style="display:flex; flex-direction:column; align-items:${m.id_mittente === data.my_user_id ? 'flex-end' : 'flex-start'}; margin-bottom:8px;">
+                <div style="background:${m.id_mittente === data.my_user_id ? '#2584ff' : 'rgba(255,255,255,0.07)'}; padding:8px 12px; border-radius:12px; max-width:80%; font-size:0.85rem;">
+                  ${m.contenuto}
+                </div>
+              </div>
+            `).join('');
+            if (scroll) container.scrollTop = container.scrollHeight;
+          }
+        });
+    }
+
+    function mSendMessage() {
+      if (!mActiveChatId) return;
+      const inp = document.getElementById('m-chat-input');
+      const text = inp.value.trim();
+      if (!text) return;
+      
+      fetch('/api/messaggi/invia', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ destinatario_id: mActiveChatId, contenuto: text })
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.ok) {
+          inp.value = '';
+          mFetchMessages(mActiveChatId, true);
+        }
+      });
+    }
+
+    function mCloseChat() {
+      document.getElementById('m-chat-layout').classList.remove('chat-open');
+      mActiveChatId = null;
+      if (mPolling) clearInterval(mPolling);
+      loadConversationsMobile();
+    }
+
+    function loadProfiloMobile() {
+      fetch('/api/profilo')
+        .then(r => r.json())
+        .then(data => {
+          if (data.ok) {
+            const user = data.user;
+            document.getElementById('m-my-name').textContent = `${user.nome} ${user.cognome}`;
+            document.getElementById('m-my-username').textContent = `@${user.username || 'username'}`;
+            document.getElementById('m-my-bio').textContent = user.descrizione_profilo || 'Nessuna bio ancora inserita.';
+            document.getElementById('m-my-av').textContent = user.nome.charAt(0).toUpperCase();
+          }
+        });
+    }
+
+    // Inizializza tab home al primo avvio
+    window.addEventListener('load', () => {
+      loadHomeMobile();
+    });
+  </script>
+</body>
+</html>

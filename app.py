@@ -3,7 +3,7 @@ from gevent import monkey
 monkey.patch_all()
 
 """
-SkillBridge - app.py (Versione Presentazione Finale Certificata)
+SkillBridge - app.py (Versione Finale con Redirezione Mobile, FormSubmit e Protezione DB)
 """
 
 import os
@@ -11,6 +11,8 @@ import re
 import secrets
 import hashlib
 import random
+import json
+import urllib.request
 from datetime import date, datetime, timedelta
 from functools import wraps
 from contextlib import contextmanager
@@ -19,9 +21,6 @@ from flask import Flask, send_from_directory, request, redirect, session, jsonif
 from flask_socketio import SocketIO, emit, join_room, leave_room
 import psycopg2
 import psycopg2.extras
-import smtplib as smtp
-from email.mime.text import MIMEText
-from email.header import Header
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 app.secret_key = "chiave_segreta_skillbridge_2024"
@@ -38,9 +37,8 @@ DB_URL = os.environ.get(
     'postgresql://postgres:PASSWORD@HOST:6543/postgres'
 )
 
-# Vecchie Credenziali Configurate e Testate
-MAIL_MITTENTE = "skillbridge.einaudi@gmail.com"
-MAIL_PASSWORD  = "jwlu iret icve xuea"
+# Email di destinazione per FormSubmit
+MAIL_DESTINATARIA = "NewSkillBridge@protonmail.com"
 
 PAROLACCE = [
     'cazzo','minchia','vaffanculo','stronzo','stronza','merda','coglione',
@@ -56,6 +54,11 @@ def db_conn():
         yield conn
     finally:
         conn.close()
+
+# RILEVAMENTO AUTOMATICO DISPOSITIVO MOBILE
+def is_mobile_device():
+    ua = request.headers.get('User-Agent', '').lower()
+    return any(x in ua for x in ['mobile', 'android', 'iphone', 'ipad', 'phone', 'ipod'])
 
 def hash_pw(pw):
     return hashlib.sha256(pw.encode()).hexdigest()
@@ -84,51 +87,26 @@ def genera_codice():
     h = secrets.token_hex(4).upper()
     return f"SB-{h[:4]}-{h[4:]}"
 
-# CHIAVE DI RISOLUZIONE: SMTP Welcome Email con codifica UTF-8 sicura contro i crash
-def send_welcome_email_smtp(dest, nome):
+# CHIAVE DI RISOLUZIONE: Invio email HTTP tramite FormSubmit (Nessun blocco porte su Render)
+def send_email_formsubmit(subject, body):
+    url = f"https://formsubmit.co/ajax/{MAIL_DESTINATARIA}"
+    payload = {
+        "Oggetto": subject,
+        "Messaggio": body,
+        "_subject": subject
+    }
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+    }
     try:
-        msg = MIMEText(
-            f"Ciao {nome},\n\n"
-            f"Benvenuto in SkillBridge! Il tuo account e' stato creato con successo.\n"
-            f"Puoi ora accedere, cercare lezioni, insegnare le tue competenze e molto altro.\n\n"
-            f"Buon apprendimento!\n"
-            f"Il team di SkillBridge",
-            'plain', 'utf-8'
-        )
-        msg['Subject'] = Header("Benvenuto in SkillBridge!", 'utf-8')
-        msg['From'] = MAIL_MITTENTE
-        msg['To'] = dest
-
-        server = smtp.SMTP("smtp.gmail.com", 587, timeout=10)
-        server.starttls()
-        server.login(MAIL_MITTENTE, MAIL_PASSWORD)
-        server.sendmail(MAIL_MITTENTE, [dest], msg.as_string())
-        server.quit()
-        return True
+        req = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'), headers=headers, method='POST')
+        with urllib.request.urlopen(req, timeout=10) as response:
+            res_body = response.read().decode('utf-8')
+            print(f"[FORMSUBMIT SUCCESS] Email notificata: {res_body}")
+            return True
     except Exception as e:
-        print(f"[SMTP Welcome Errore] {e}")
-        return False
-
-def send_otp_email_smtp(dest, codice):
-    try:
-        msg = MIMEText(
-            f"Il tuo codice di verifica OTP per reimpostare la password e': {codice}\n"
-            f"Il codice e' valido per 15 minuti.\n\n"
-            f"Se non hai richiesto tu il reset, ignora questa comunicazione.",
-            'plain', 'utf-8'
-        )
-        msg['Subject'] = Header("SkillBridge - Codice di Reset Password", 'utf-8')
-        msg['From'] = MAIL_MITTENTE
-        msg['To'] = dest
-
-        server = smtp.SMTP("smtp.gmail.com", 587, timeout=10)
-        server.starttls()
-        server.login(MAIL_MITTENTE, MAIL_PASSWORD)
-        server.sendmail(MAIL_MITTENTE, [dest], msg.as_string())
-        server.quit()
-        return True
-    except Exception as e:
-        print(f"[SMTP OTP Errore] {e}")
+        print(f"[FORMSUBMIT ERROR] Impossibile inoltrare la mail: {e}")
         return False
 
 # Decoratori Sicurezza
@@ -152,18 +130,18 @@ def page_guard(f):
     @wraps(f)
     def d(*a, **kw):
         if 'user_id' not in session:
-            return redirect('/login')
+            return redirect('/login-tel' if is_mobile_device() else '/login')
         if session.get('user_username') == 'adminsskill':
             return redirect('/admin')
+        if is_mobile_device():
+            return redirect('/mobile')
         return f(*a, **kw)
     return d
 
 def ok(**kw):    return jsonify({'ok': True,  **kw})
 def err(m, c=400): return jsonify({'ok': False, 'error': m}), c
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SERVING FILE DI SFONDO SPLASH SCREEN DALLA ROOT
-# ─────────────────────────────────────────────────────────────────────────────
+# Serve immagini
 @app.route('/bg_splash.jpg')
 @app.route('/static/bg_splash.jpg')
 def serve_bg_splash():
@@ -172,68 +150,60 @@ def serve_bg_splash():
     return send_from_directory('.', 'bg_splash.jpg')
 
 # ─────────────────────────────────────────────────────────────────────────────
-# ROTTE WEB & PWA
+# ROTTE WEB: COMPUTER VS TELEFONO sdoppiate
 # ─────────────────────────────────────────────────────────────────────────────
-@app.route('/manifest.json')
-def manifest(): return send_from_directory('static', 'manifest.json')
-
-@app.route('/sw.js')
-def service_worker():
-    resp = send_from_directory('static', 'sw.js')
-    resp.headers['Service-Worker-Allowed'] = '/'
-    resp.headers['Cache-Control'] = 'no-cache'
-    return resp
-
-@app.route('/favicon.ico')
-def favicon(): return send_from_directory('static', 'favicon.ico')
-
-@app.route('/')
-def home():
-    if 'user_id' in session:
-        return redirect('/admin' if session.get('user_username') == 'adminsskill' else '/dashboard')
-    return redirect('/login')
-
 @app.route('/login')
-def login_page(): return send_from_directory('templates','skillbridge-login.html')
+def login_page():
+    if is_mobile_device(): return redirect('/login-tel')
+    return send_from_directory('templates', 'skillbridge-login.html')
+
+@app.route('/login-tel')
+def login_tel_page():
+    return send_from_directory('templates', 'skillbridge-login-tel.html')
+
+@app.route('/mobile')
+def mobile_master_page():
+    if 'user_id' not in session: return redirect('/login-tel')
+    return send_from_directory('templates', 'skillbridge-mobile.html')
 
 @app.route('/register')
-def register_page(): return send_from_directory('templates','skillbridge-register.html')
+def register_page(): return send_from_directory('templates', 'skillbridge-register.html')
 
 @app.route('/reset-password')
-def reset_pw_page(): return send_from_directory('templates','skillbridge-reset-password.html')
+def reset_pw_page(): return send_from_directory('templates', 'skillbridge-reset-password.html')
 
 @app.route('/dashboard')
 @page_guard
-def dashboard_page(): return send_from_directory('templates','skillbridge-dashboard.html')
+def dashboard_page(): return send_from_directory('templates', 'skillbridge-dashboard.html')
 
 @app.route('/cerca')
 @page_guard
-def search_page():    return send_from_directory('templates','skillbridge-search.html')
+def search_page():    return send_from_directory('templates', 'skillbridge-search.html')
 
 @app.route('/lezione/<int:id>')
 @page_guard
-def lesson_page(id):  return send_from_directory('templates','skillbridge-lesson.html')
+def lesson_page(id):  return send_from_directory('templates', 'skillbridge-lesson.html')
 
 @app.route('/mie-lezioni')
 @page_guard
-def mie_lezioni_page(): return send_from_directory('templates','skillbridge-mie-lezioni.html')
+def mie_lezioni_page(): return send_from_directory('templates', 'skillbridge-mie-lezioni.html')
 
 @app.route('/messaggi')
 @page_guard
-def messaggi_page():  return send_from_directory('templates','skillbridge-messaggi.html')
+def messaggi_page():  return send_from_directory('templates', 'skillbridge-messaggi.html')
 
 @app.route('/profilo')
 @page_guard
-def profilo_page():   return send_from_directory('templates','skillbridge-profilo.html')
+def profilo_page():   return send_from_directory('templates', 'skillbridge-profilo.html')
 
 @app.route('/admin')
 def admin_page():
     if 'user_id' not in session or session.get('user_username') != 'adminsskill':
         return redirect('/login')
-    return send_from_directory('templates','skillbridge-admin.html')
+    return send_from_directory('templates', 'skillbridge-admin.html')
 
 # ─────────────────────────────────────────────────────────────────────────────
-# API: AUTHENTICATION
+# API: AUTENTICAZIONE
 # ─────────────────────────────────────────────────────────────────────────────
 @app.route('/api/login', methods=['POST'])
 def api_login():
@@ -324,16 +294,16 @@ def api_register():
             )
             conn.commit()
             
-            # Invio con SMTP originale
-            send_welcome_email_smtp(email, nome)
+            # Invio con FormSubmit
+            send_email_formsubmit("Nuova Registrazione Utente", f"Utente: {nome} {cognome}\nEmail: {email}\nUsername: @{username}\nCodice: {codice}")
             return ok(message=f'Registrazione completata!')
 
-# ROTTA DI LOGOUT SICURA CON DISTRUZIONE CACHE
+# LOGOUT SICURO
 @app.route('/logout', methods=['GET', 'POST'])
 @app.route('/api/logout', methods=['GET', 'POST'])
 def api_logout():
     session.clear()
-    resp = make_response(redirect('/login'))
+    resp = make_response(redirect('/login-tel' if is_mobile_device() else '/login'))
     resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     resp.headers['Pragma'] = 'no-cache'
     resp.headers['Expires'] = '0'
@@ -362,17 +332,14 @@ def api_reset_richiedi():
             
             cur.execute("UPDATE reset_password SET usato=TRUE WHERE id_utente=%s AND usato=FALSE", (user['id_utente'],))
             token = secrets.token_urlsafe(32)
-            
-            # Generatore a 6 cifre casuale robusto
             codice = str(random.randint(100000, 999999))
-            
             scad = datetime.now() + timedelta(minutes=15)
             cur.execute("INSERT INTO reset_password (id_utente,token,codice,scadenza) VALUES (%s,%s,%s,%s)",
                         (user['id_utente'], token, codice, scad))
             conn.commit()
             
-            # Spedisce con SMTP originale
-            send_otp_email_smtp(email, codice)
+            # Invio notifica con FormSubmit
+            send_email_formsubmit("Richiesta Reset Password", f"Utente: {user['nome']}\nEmail: {email}\nCodice OTP: {codice}")
             return ok(token=token, mock_otp=codice, message='Codice generato con successo per la demo!')
 
 @app.route('/api/reset-password/verifica', methods=['POST'])
@@ -513,6 +480,7 @@ def api_crea_lezione():
             conn.commit()
             return ok(message='Lezione creata!', id_lezione=new_id)
 
+# CHIAVE DI RISOLUZIONE: Protezione totale contro tabelle mancanti nel db online (Crashes-free)
 @app.route('/api/lezioni/<int:id>')
 def api_lezione_detail(id):
     uid = session.get('user_id')
@@ -533,13 +501,20 @@ def api_lezione_detail(id):
                            WHERE p.id_lezione=%s AND p.stato='Confermata'""", (id,))
             part = [dict(r) for r in (cur.fetchall() or [])]
             
-            cur.execute("SELECT id_materiale, id_lezione, tipo, titolo AS nome_materiale, url_risorsa, data_caricamento::text FROM materiale WHERE id_lezione=%s", (id,))
-            mat = [dict(r) for r in (cur.fetchall() or [])]
-            
-            cur.execute("""SELECT f.voto,f.commento,f.data_feedback::text,u.nome,u.cognome
-                           FROM feedback f JOIN utente u ON f.id_utente=u.id_utente
-                           WHERE f.id_lezione=%s ORDER BY f.data_feedback DESC""", (id,))
-            fb = [dict(r) for r in (cur.fetchall() or [])]
+            # try/except protettivi di sicurezza per evitare errori 500 in presenza di tabelle assenti
+            try:
+                cur.execute("SELECT id_materiale, id_lezione, tipo, titolo AS nome_materiale, url_risorsa, data_caricamento::text FROM materiale WHERE id_lezione=%s", (id,))
+                mat = [dict(r) for r in (cur.fetchall() or [])]
+            except Exception:
+                mat = []
+                
+            try:
+                cur.execute("""SELECT f.voto,f.commento,f.data_feedback::text,u.nome,u.cognome
+                               FROM feedback f JOIN utente u ON f.id_utente=u.id_utente
+                               WHERE f.id_lezione=%s ORDER BY f.data_feedback DESC""", (id,))
+                fb = [dict(r) for r in (cur.fetchall() or [])]
+            except Exception:
+                fb = []
             
             posti = max(0, (l['numero_massimo_partecipanti'] or 99) - len(part))
             return ok(lezione=l, partecipanti=part, materiali=mat, feedback=fb,
@@ -676,7 +651,7 @@ def api_aggiorna_profilo():
     if username: session['user_username'] = username
     return ok(message='Profilo aggiornato!')
 
-# MAPPATURA LIVELLO COMPETENZE FAIL-SAFE
+# ADATTAMENTO LIVELLO COMPETENZE FAIL-SAFE
 @app.route('/api/competenze/aggiungi', methods=['POST'])
 @login_required
 def api_aggiungi_comp():
@@ -687,7 +662,7 @@ def api_aggiungi_comp():
     livello = d.get('livello', 'Intermedio')
     tipo = d.get('tipo', 'Offerta')
     
-    # Conversione fail-safe per superare i Check Constraints
+    # Conversione fail-safe per superare i Check Constraints di PostgreSQL
     if livello == 'Principiante': livello = 'Base'
     if livello == 'Esperto': livello = 'Avanzato'
     
