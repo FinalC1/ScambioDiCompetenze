@@ -4,7 +4,6 @@ window.addEventListener('load', () => {
     loadProfilo();
 });
 
-// CHIAVE DI RISOLUZIONE: Carica i gestori d'evento quando la struttura HTML della pagina è pronta
 document.addEventListener('DOMContentLoaded', () => {
     const settingsBtn = document.getElementById('settingsBtn');
     if (settingsBtn) {
