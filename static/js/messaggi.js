@@ -6,7 +6,6 @@ let pollingInterval = null;
 window.addEventListener('load', () => {
     loadConversations();
 
-    // Controlla se siamo stati reindirizzati cliccando su "Contatta Insegnante"
     const directId = sessionStorage.getItem('sb_direct_chat_id');
     const directName = sessionStorage.getItem('sb_direct_chat_name');
     if (directId && directName) {
@@ -92,6 +91,11 @@ function renderChat(userId, userName) {
     document.getElementById('chat-area').innerHTML = `
     <div class="chat-hdr">
       <div class="chat-hdr-l">
+        <!-- PULSANTE INDIETRO PER CELLULARI (Instagram Style) -->
+        <button onclick="closeChatMobile()" class="menu-btn back-mobile-btn" style="display:none; margin-right: 8px; padding: 4px;">
+          <svg fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" style="width:20px; height:20px;"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" /></svg>
+        </button>
+        
         <div class="hdr-av">
           <svg viewBox="0 0 44 44">
             <circle cx="22" cy="22" r="22" fill="#0f2a3f"/>
@@ -120,7 +124,20 @@ function renderChat(userId, userName) {
     </div>
   `;
 
+    // Mostra il pulsante indietro su mobile
+    if (window.innerWidth <= 768) {
+        const btn = document.querySelector('.back-mobile-btn');
+        if (btn) btn.style.display = 'block';
+    }
+
     fetchChatMessages(userId, true);
+}
+
+function closeChatMobile() {
+    document.querySelector('.main-content').classList.remove('chat-open');
+    window.activeChatId = null;
+    if (pollingInterval) clearInterval(pollingInterval);
+    loadConversations();
 }
 
 function fetchChatMessages(userId, scroll = false) {
@@ -145,12 +162,17 @@ function fetchChatMessages(userId, scroll = false) {
                 }
             }
         })
-        .catch(err => console.error('Errore caricamento storico messaggi:', err));
+        .catch(err => console.error('Errore storico messaggi:', err));
 }
 
 function openConv(userId, userName) {
     window.activeChatId = userId;
     window.activeSenderName = userName;
+
+    // Transizione per mobile (Instagram)
+    const mainContent = document.querySelector('.main-content');
+    if (mainContent) mainContent.classList.add('chat-open');
+
     renderChat(userId, userName);
 
     document.querySelectorAll('.conv-item').forEach(el => {
@@ -158,7 +180,6 @@ function openConv(userId, userName) {
         else el.classList.remove('active');
     });
 
-    // AVVIO POLLING AUTOMATICO (Aggiorna la chat in background ogni 2.5 secondi)
     if (pollingInterval) clearInterval(pollingInterval);
     pollingInterval = setInterval(() => {
         if (window.activeChatId === userId) {
@@ -167,14 +188,12 @@ function openConv(userId, userName) {
     }, 2500);
 }
 
-// CHIAVE DI RISOLUZIONE: INVIO MESSAGGI VIA RICHIESTA HTTP POST (INDISTRUTTIBILE)
 window.sendMessage = function() {
     if (!window.activeChatId) return;
     const inp = document.getElementById('chat-input');
     const text = inp ? inp.value.trim() : '';
     if (!text) return;
 
-    // Invio della richiesta HTTP sicura
     fetch('/api/messaggi/invia', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -190,13 +209,10 @@ window.sendMessage = function() {
                 fetchChatMessages(window.activeChatId, true);
                 loadConversations();
             } else {
-                alert("Impossibile inviare il messaggio: " + data.error);
+                alert("Impossibile inviare: " + data.error);
             }
         })
-        .catch(err => {
-            console.error("Errore nell'invio del messaggio:", err);
-            alert("Errore di rete. Impossibile inviare.");
-        });
+        .catch(err => console.error(err));
 };
 
 function escapeHtml(str) {

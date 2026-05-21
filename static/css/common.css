@@ -1,77 +1,111 @@
-/* --- OTTIMIZZAZIONI DISPOSITIVI MOBILI --- */
+/* ─── STILE NATIVO MOBILE / INSTAGRAM STYLE ─── */
 
 @media (max-width: 768px) {
     body {
-        flex-direction: column-reverse;
-        /* Sposta la sidebar in basso come barra di navigazione nativa */
+        flex-direction: column-reverse !important;
+        /* Sidebar in basso su mobile */
+        overflow-x: hidden;
     }
+    /* Barra di Navigazione Inferiore (Tipo Instagram) */
     .sidebar {
         width: 100% !important;
-        height: 60px !important;
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
+        height: 65px !important;
+        position: fixed !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        top: auto !important;
         flex-direction: row !important;
-        justify-content: space-around;
+        justify-content: space-around !important;
         padding: 0 !important;
-        background: #080f18;
-        z-index: 9999;
-        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        background: #080f18 !important;
+        z-index: 9999 !important;
+        border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
         border-right: none !important;
+        box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
     }
+    /* Nascondi elementi non necessari nella barra inferiore */
     .sidebar-logo,
     .sidebar-section-label,
     .sidebar-spacer,
-    .sb-space {
+    .sb-space,
+    .sidebar-logout span,
+    .nav-item span {
         display: none !important;
     }
     .sidebar-sec,
     .sidebar-section {
-        display: flex;
-        width: 100%;
-        justify-content: space-around;
+        display: flex !important;
+        width: 100% !important;
+        justify-content: space-around !important;
         padding: 0 !important;
         margin: 0 !important;
+        flex-direction: row !important;
     }
     .nav-item {
-        padding: 10px !important;
-        font-size: 0.8rem;
-        flex-direction: column;
-        gap: 2px !important;
+        padding: 15px !important;
+        flex: 1;
+        display: flex;
+        justify-content: center;
+        align-items: center;
     }
-    .sb-out,
+    .nav-item svg {
+        width: 24px !important;
+        height: 24px !important;
+        margin: 0 auto !important;
+    }
     .sidebar-logout {
         margin: 0 !important;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 20%;
     }
+    .sidebar-logout a {
+        padding: 15px !important;
+    }
+    /* Area Principale del Contenuto */
     .main {
         margin-left: 0 !important;
-        padding: 16px 16px 80px 16px !important;
-        /* Spazio in basso per non coprire il contenuto con la barra */
+        padding: 16px 16px 85px 16px !important;
+        /* Spazio in basso per non coprire il testo con la barra */
+        width: 100% !important;
+        box-sizing: border-box;
     }
-    /* Layout chat responsivo */
+    /* Gestione Chat Responsiva (WhatsApp/Instagram Style) */
     .main-content {
         flex-direction: column !important;
-        height: calc(100vh - 80px) !important;
-        padding: 10px !important;
+        height: calc(100vh - 100px) !important;
+        padding: 0 !important;
+        gap: 0 !important;
+    }
+    /* Se la chat non è aperta, nascondi l'area dei messaggi */
+    .main-content:not(.chat-open) .chat-area {
+        display: none !important;
+    }
+    /* Se la chat è aperta, nascondi la lista dei contatti */
+    .main-content.chat-open .conv-panel {
+        display: none !important;
     }
     .conv-panel {
         width: 100% !important;
-        height: 220px !important;
+        height: 100% !important;
+        border-radius: 0 !important;
+        border: none !important;
     }
     .chat-area {
         width: 100% !important;
-        height: calc(100vh - 320px) !important;
+        height: 100% !important;
+        border-radius: 0 !important;
+        border: none !important;
+    }
+    .chat-bar {
+        padding: 10px 12px 12px !important;
     }
     .stats-row {
         grid-template-columns: 1fr !important;
-        gap: 12px;
     }
     .layout {
         grid-template-columns: 1fr !important;
-    }
-    .info-card {
-        position: relative !important;
-        top: 0 !important;
     }
 }

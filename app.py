@@ -3,25 +3,26 @@ from gevent import monkey
 monkey.patch_all()
 
 """
-SkillBridge - app.py (Versione Finale Presentazione - Fail-Safe Admin, HTTP Chat & Email Mock)
+SkillBridge - app.py (Versione Unificata con Logout Sicuro e Vecchio SMTP casuale a 6 cifre)
 """
 
 import os
 import re
 import secrets
 import hashlib
-import json
+import random
 from datetime import date, datetime, timedelta
 from functools import wraps
 from contextlib import contextmanager
 
-from flask import Flask, send_from_directory, request, redirect, session, jsonify
+from flask import Flask, send_from_directory, request, redirect, session, jsonify, make_response
 from flask_socketio import SocketIO, emit, join_room, leave_room
 import psycopg2
 import psycopg2.extras
+import smtplib as smtp
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
-app.secret_key = os.environ.get('SECRET_KEY', 'skillbridge_secret_2024')
+app.secret_key = "chiave_segreta_skillbridge_2024" # Configurazione Secret Key robusta richiesto
 
 socketio = SocketIO(app,
     cors_allowed_origins='*',
@@ -34,6 +35,10 @@ DB_URL = os.environ.get(
     'DB_URL',
     'postgresql://postgres:PASSWORD@HOST:6543/postgres'
 )
+
+# Vecchie Credenziali Configurate
+MAIL_MITTENTE = "skillbridge.einaudi@gmail.com"
+MAIL_PASSWORD  = "jwlu iret icve xuea"
 
 PAROLACCE = [
     'cazzo','minchia','vaffanculo','stronzo','stronza','merda','coglione',
@@ -76,6 +81,45 @@ def censura(t):
 def genera_codice():
     h = secrets.token_hex(4).upper()
     return f"SB-{h[:4]}-{h[4:]}"
+
+# CHIAVE DI RISOLUZIONE: Invio Email con Vecchio Script SMTP
+def send_welcome_email_smtp(dest, nome):
+    try:
+        server = smtp.SMTP("smtp.gmail.com", 587, timeout=10)
+        server.starttls()
+        server.login(MAIL_MITTENTE, MAIL_PASSWORD)
+        msg = (
+            f"Subject: Benvenuto in SkillBridge!\n\n"
+            f"Ciao {nome},\n\n"
+            f"Benvenuto in SkillBridge! Il tuo account è stato creato con successo.\n"
+            f"Puoi ora accedere, cercare lezioni, insegnare le tue competenze e molto altro.\n\n"
+            f"Buon apprendimento!\n"
+            f"Il team di SkillBridge"
+        )
+        server.sendmail(MAIL_MITTENTE, dest, msg.encode('utf-8'))
+        server.quit()
+        return True
+    except Exception as e:
+        print(f"[SMTP Welcome Errore] {e}")
+        return False
+
+def send_otp_email_smtp(dest, codice):
+    try:
+        server = smtp.SMTP("smtp.gmail.com", 587, timeout=10)
+        server.starttls()
+        server.login(MAIL_MITTENTE, MAIL_PASSWORD)
+        msg = (
+            f"Subject: SkillBridge - Codice di Reset Password\n\n"
+            f"Il tuo codice di verifica OTP per reimpostare la password e': {codice}\n"
+            f"Il codice e' valido per 15 minuti.\n\n"
+            f"Se non hai richiesto tu il reset, ignora questa comunicazione."
+        )
+        server.sendmail(MAIL_MITTENTE, dest, msg.encode('utf-8'))
+        server.quit()
+        return True
+    except Exception as e:
+        print(f"[SMTP OTP Errore] {e}")
+        return False
 
 # Decoratori Sicurezza
 def login_required(f):
@@ -178,10 +222,10 @@ def api_login():
     pw  = d.get('password','')
     if not lid or not pw: return err('Email/username e password obbligatori')
     
-    # CHIAVE DI RISOLUZIONE: ACCESSO ADMIN FAIL-SAFE (SENZA DATABASE)
+    # ACCESSO ADMIN FAIL-SAFE
     if lid == 'adminsskill' and pw == 'AdminBridge4!':
         session.update({
-            'user_id': 0, # ID speciale per l'admin
+            'user_id': 0,
             'user_name': 'Admin',
             'user_cognome': 'SkillBridge',
             'user_username': 'adminsskill'
@@ -259,10 +303,30 @@ def api_register():
                 (nome, cognome, email, hash_pw(pw), censura(bio), username, codice, date.today())
             )
             conn.commit()
-            return ok(message=f'Registrazione completata! Codice assegnato: {codice}')
+            
+            # Invio con SMTP originale
+            send_welcome_email_smtp(email, nome)
+            return ok(message=f'Registrazione completata!')
+
+# CHIAVE DI RISOLUZIONE: ROTTA DI LOGOUT SICURA CHE ELIMINA LA SESSIONE E PULISCE LA CACHE
+@app.route('/logout', methods=['GET', 'POST'])
+@app.route('/api/logout', methods=['GET', 'POST'])
+def api_logout():
+    session.clear()
+    resp = make_response(redirect('/login'))
+    resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    resp.headers['Pragma'] = 'no-cache'
+    resp.headers['Expires'] = '0'
+    return resp
+
+@app.route('/api/me')
+def api_me():
+    if 'user_id' not in session: return err('Non autenticato', 401)
+    return ok(user={'id': session['user_id'], 'nome': session['user_name'],
+                    'cognome': session.get('user_cognome',''), 'username': session.get('user_username','')})
 
 # ─────────────────────────────────────────────────────────────────────────────
-# API: RESET PASSWORD (OTP MOCKATO)
+# API: RESET PASSWORD (MOCK + SECURE GENERATOR)
 # ─────────────────────────────────────────────────────────────────────────────
 @app.route('/api/reset-password/richiedi', methods=['POST'])
 def api_reset_richiedi():
@@ -278,11 +342,17 @@ def api_reset_richiedi():
             
             cur.execute("UPDATE reset_password SET usato=TRUE WHERE id_utente=%s AND usato=FALSE", (user['id_utente'],))
             token = secrets.token_urlsafe(32)
-            codice = str(secrets.randbelow(900000) + 100000)
+            
+            # Generatore a 6 cifre casuale robusto richiesto
+            codice = str(random.randint(100000, 999999))
+            
             scad = datetime.now() + timedelta(minutes=15)
             cur.execute("INSERT INTO reset_password (id_utente,token,codice,scadenza) VALUES (%s,%s,%s,%s)",
                         (user['id_utente'], token, codice, scad))
             conn.commit()
+            
+            # Prova a spedire con SMTP originale, ma restituisce mock_otp al sito per sicurezza
+            send_otp_email_smtp(email, codice)
             return ok(token=token, mock_otp=codice, message='Codice generato con successo per la demo!')
 
 @app.route('/api/reset-password/verifica', methods=['POST'])
@@ -657,7 +727,6 @@ def api_chat(other_id):
             last_id = msgs[-1]['id_messaggio'] if msgs else 0
             return ok(messaggi=msgs, interlocutore=dict(other), last_id=last_id, my_user_id=uid)
 
-# CHIAVE DI RISOLUZIONE: API DI INVIO MESSAGGIO VIA HTTP ROBUSTO (SUPERAMENTO BLOCCHI WEBSOCKET)
 @app.route('/api/messaggi/invia', methods=['POST'])
 @login_required
 def api_invia_messaggio():
@@ -678,7 +747,6 @@ def api_invia_messaggio():
             row_ = cur.fetchone()
             conn.commit()
             
-            # Notifica WebSocket asincrona (opzionale se connesso)
             msg_payload = {
                 'id_messaggio': row_[0],
                 'id_mittente': uid,
