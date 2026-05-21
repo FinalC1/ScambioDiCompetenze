@@ -6,7 +6,7 @@ function showMsg(text, type = 'err') {
     el.textContent = text;
     el.className = `msg ${type}`;
     el.style.display = 'block';
-    setTimeout(() => el.style.display = 'none', 5000);
+    setTimeout(() => el.style.display = 'none', 8000);
 }
 
 function setLoading(btnId, loading) {
@@ -26,18 +26,30 @@ function goStep1() { goStep(1); }
 async function step1Submit() {
     const email = document.getElementById('email-input').value.trim();
     if (!email) { showMsg('Inserisci la tua email'); return; }
-    document.getElementById('btn1').dataset.label = 'Invia codice';
+    document.getElementById('btn1').dataset.label = 'Genera codice OTP';
     setLoading('btn1', true);
+
     const r = await fetch('/api/reset-password/richiedi', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email })
     }).then(x => x.json());
+
     setLoading('btn1', false);
     if (r.ok) {
         _token = r.token || '';
-        showMsg('Codice inviato! Controlla la tua email.', 'ok');
-        setTimeout(() => goStep(2), 1200);
+
+        // CHIAVE DI RISOLUZIONE: Mostra l'OTP direttamente nel box grafico simulatore all'interno della pagina
+        if (r.mock_otp) {
+            const displayBox = document.getElementById('demo-otp-display');
+            const codeSpan = document.getElementById('demo-otp-code');
+            if (displayBox && codeSpan) {
+                codeSpan.textContent = r.mock_otp;
+                displayBox.style.display = 'block';
+            }
+        }
+
+        setTimeout(() => goStep(2), 500);
     } else {
         showMsg(r.error || 'Errore');
     }
@@ -48,11 +60,13 @@ async function step2Submit() {
     if (codice.length < 6) { showMsg('Inserisci il codice a 6 cifre'); return; }
     document.getElementById('btn2').dataset.label = 'Verifica codice';
     setLoading('btn2', true);
+
     const r = await fetch('/api/reset-password/verifica', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: _token, codice })
     }).then(x => x.json());
+
     setLoading('btn2', false);
     if (r.ok) {
         _codice = codice;
@@ -69,11 +83,13 @@ async function step3Submit() {
     if (pw1 !== pw2) { showMsg('Le password non coincidono'); return; }
     document.getElementById('btn3').dataset.label = 'Aggiorna password';
     setLoading('btn3', true);
+
     const r = await fetch('/api/reset-password/nuova', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: _token, codice: _codice, password: pw1 })
     }).then(x => x.json());
+
     setLoading('btn3', false);
     if (r.ok) {
         goStep(4);
